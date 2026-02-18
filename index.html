@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TURRET CHESS ONLINE v13.2</title>
+    <title>TURRET CHESS ONLINE v13.3</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #1a1a1a; color: #fff; font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #lobby { background: rgba(0,0,0,0.9); padding: 25px; border-radius: 15px; text-align: center; border: 2px solid #4caf50; width: 300px; }
+        #lobby { background: rgba(0,0,0,0.95); padding: 25px; border-radius: 15px; text-align: center; border: 2px solid #4caf50; width: 320px; box-shadow: 0 0 40px rgba(0,0,0,1); }
         #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; }
         #board { display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); background: #444; position: relative; border: 5px solid #333; }
         @media (max-width: 500px) { #board { grid-template-columns: repeat(8, 11.5vw); grid-template-rows: repeat(8, 11.5vw); } .cell { width: 11.5vw !important; height: 11.5vw !important; font-size: 30px !important; } }
@@ -21,31 +21,33 @@
         .valid-shoot { background: #ff5252 !important; box-shadow: inset 0 0 15px rgba(255, 0, 85, 0.4); }
         .hp-bar { position: absolute; top: 2px; left: 5px; right: 5px; height: 4px; background: #333; border: 1px solid #000; border-radius: 2px; overflow: hidden; pointer-events: none; }
         .hp-fill { height: 100%; background: #00ff00; transition: width 0.3s; }
-        .btn { background: #4caf50; border: none; color: white; padding: 12px 24px; font-weight: bold; cursor: pointer; border-radius: 8px; margin: 10px 0; text-transform: uppercase; }
+        .btn { background: #4caf50; border: none; color: white; padding: 12px 24px; font-weight: bold; cursor: pointer; border-radius: 8px; margin: 5px 0; text-transform: uppercase; width: 100%; }
         .btn.blue { background: #2196f3; }
+        .btn.orange { background: #ff9800; font-size: 11px; }
         #status-bar { font-size: 14px; margin-bottom: 10px; font-weight: bold; }
         .fx-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; }
         .bullet { position: absolute; width: 8px; height: 8px; background: yellow; border-radius: 50%; box-shadow: 0 0 10px orange; }
         .explosion { position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, orange, transparent); border-radius: 50%; animation: explode 0.4s ease-out forwards; }
         @keyframes explode { 0% { transform: scale(0.1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+        #debug { font-size: 9px; color: #555; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div id="lobby">
         <h2 style="margin:0">TURRET CHESS</h2>
-        <div id="lobby-status" style="color: #ffeb3b; font-size: 11px; margin: 10px 0;">Сеть: Инициализация...</div>
+        <div id="lobby-status" style="color: #ffeb3b; font-size: 11px; margin: 10px 0;">Инициализация сети...</div>
         
         <div id="host-ui" style="display:none">
-            <div id="my-id" onclick="copyId()" style="cursor:pointer; font-weight:bold; font-size:16px; color:#4caf50; background:#222; padding:10px; border-radius:5px; margin:10px 0; word-break: break-all;">----</div>
-            <div style="font-size:10px; color:#666">Кликни на ID, чтобы скопировать</div>
+            <div id="my-id" style="font-weight:bold; font-size:16px; color:#4caf50; background:#222; padding:10px; border-radius:5px; margin:10px 0; word-break: break-all;">----</div>
+            <button class="btn orange" onclick="copyInviteLink()">СКОПИРОВАТЬ ССЫЛКУ</button>
         </div>
 
-        <div id="join-ui" style="display:none; margin-top:15px; border-top: 1px solid #333; padding-top:15px;">
-            <input type="text" id="target-id" placeholder="ID друга" style="padding:10px; border-radius:5px; border:none; width:80%; margin-bottom:10px; text-align:center;">
+        <div id="join-ui" style="display:none; margin-top:10px; border-top: 1px solid #333; padding-top:10px;">
+            <input type="text" id="target-id" placeholder="Введи ID вручную" style="padding:10px; border-radius:5px; border:none; width:90%; margin-bottom:5px; text-align:center; background:#333; color:#fff;">
             <button class="btn blue" onclick="joinRoom()">ПОДКЛЮЧИТЬСЯ</button>
         </div>
-        <button id="force-start" class="btn" style="display:none; background:#ff9800" onclick="startOnlineGame()">ПНУТЬ СЕТЬ (СТАРТ)</button>
+        <div id="debug"></div>
     </div>
 
     <div id="game-ui">
@@ -64,50 +66,51 @@
         const pieceStats = { p: { hp: 2, damage: 1 }, r: { hp: 7, damage: 3 }, n: { hp: 4, damage: 2 }, b: { hp: 4, damage: 2 }, q: { hp: 10, damage: 3 }, k: { hp: 15, damage: 1 } };
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        function playSound(freq, type, duration, volume = 0.1) {
-            try { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + duration); gain.gain.setValueAtTime(volume, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration); } catch(e){}
-        }
+        function log(m) { document.getElementById('debug').innerText = m; console.log(m); }
 
         function initNetwork() {
-            peer = new Peer();
+            peer = new Peer({
+                config: { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }, { 'urls': 'stun:stun1.l.google.com:19302' }] }
+            });
             peer.on('open', id => {
-                document.getElementById('lobby-status').innerText = "Сеть: ОК. Ждем друга...";
+                document.getElementById('lobby-status').innerText = "Сеть готова";
                 document.getElementById('my-id').innerText = id;
                 document.getElementById('host-ui').style.display = 'block';
                 document.getElementById('join-ui').style.display = 'block';
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('join')) {
+                    document.getElementById('target-id').value = urlParams.get('join');
+                    setTimeout(joinRoom, 500);
+                }
             });
             peer.on('connection', c => {
+                if (conn) return;
                 conn = c; myColor = 'white'; setupConn();
-                document.getElementById('lobby-status').innerText = "Друг стучится...";
-                document.getElementById('force-start').style.display = 'block';
-                setTimeout(() => { if(conn.open) conn.send({type:'HELLO_BACK'}); }, 500);
+                log("Входящее соединение...");
             });
-            peer.on('error', err => { document.getElementById('lobby-status').innerText = "Ошибка: " + err.type; });
+            peer.on('error', err => { log("Ошибка PeerJS: " + err.type); });
         }
 
         function joinRoom() {
             const id = document.getElementById('target-id').value.trim();
             if (!id) return;
-            document.getElementById('lobby-status').innerText = "Соединение...";
-            conn = peer.connect(id);
+            log("Подключение к " + id + "...");
+            conn = peer.connect(id, { reliable: true });
             myColor = 'black';
-            conn.on('open', () => { 
-                setupConn(); 
-                conn.send({type:'HELLO'}); 
-                document.getElementById('lobby-status').innerText = "Рукопожатие...";
-            });
+            conn.on('open', () => { log("Канал открыт!"); setupConn(); conn.send({type:'HELLO'}); });
+            conn.on('error', e => log("Ошибка соединения: " + e));
         }
 
         function setupConn() {
             conn.on('data', data => {
-                if (data.type === 'HELLO' || data.type === 'HELLO_BACK') startOnlineGame();
+                if (data.type === 'HELLO') { conn.send({type:'HELLO_BACK'}); startOnlineGame(); }
+                if (data.type === 'HELLO_BACK') { startOnlineGame(); }
                 if (data.type === 'move') {
                     if (data.shoot) shootFX(data.shoot.fromR, data.shoot.fromC, data.shoot.toR, data.shoot.toC).then(() => applySync(data));
                     else applySync(data);
                 }
-                if (data.type === 'PING') conn.send({type:'PONG'});
             });
-            setInterval(() => { if(conn && conn.open) conn.send({type:'PING'}); }, 3000);
+            conn.on('close', () => { alert("Противник ушел!"); location.reload(); });
         }
 
         function applySync(data) { board = data.board; turn = data.turn; gameState = data.gameState; render(); }
@@ -117,6 +120,7 @@
             document.getElementById('lobby').style.display = 'none';
             document.getElementById('game-ui').style.display = 'flex';
             initGame();
+            if (myColor === 'white') endTurn(null);
         }
 
         function initGame() {
@@ -180,21 +184,20 @@
             function getCoords(r, c) { let dispR = myColor === 'black' ? r : 7 - r; let dispC = myColor === 'black' ? 7 - c : c; return { x: dispC * cellW + cellW/2, y: dispR * cellW + cellW/2 }; }
             const start = getCoords(fromR, fromC), end = getCoords(toR, toC);
             const bullet = document.createElement('div'); bullet.className = 'bullet'; bullet.style.left = start.x + 'px'; bullet.style.top = start.y + 'px';
-            layer.appendChild(bullet); playSound(400, 'sawtooth', 0.1);
+            layer.appendChild(bullet); try { const osc = audioCtx.createOscillator(); const g = audioCtx.createGain(); osc.connect(g); g.connect(audioCtx.destination); osc.frequency.setValueAtTime(400,0); osc.start(); osc.stop(0.1); } catch(e){}
             const duration = 300, startTime = performance.now();
             return new Promise(resolve => {
                 function animate(time) {
                     const progress = Math.min((time - startTime) / duration, 1);
                     bullet.style.left = start.x + (end.x - start.x) * progress + 'px'; bullet.style.top = start.y + (end.y - start.y) * progress + 'px';
                     if (progress < 1) requestAnimationFrame(animate);
-                    else { bullet.remove(); const exp = document.createElement('div'); exp.className = 'explosion'; exp.style.left = (end.x - 25) + 'px'; exp.style.top = (end.y - 25) + 'px'; layer.appendChild(exp); playSound(100, 'square', 0.3, 0.2); setTimeout(() => { exp.remove(); resolve(); }, 400); }
+                    else { bullet.remove(); const exp = document.createElement('div'); exp.className = 'explosion'; exp.style.left = (end.x - 25) + 'px'; exp.style.top = (end.y - 25) + 'px'; layer.appendChild(exp); setTimeout(() => { exp.remove(); resolve(); }, 400); }
                 }
                 requestAnimationFrame(animate);
             });
         }
 
         async function handleCellClick(r, c, e) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
             if (turn !== myColor) return; 
             const piece = board[r][c];
             if (gameState === 'select') {
@@ -205,7 +208,6 @@
                     render();
                 } else if (selectedPiece) {
                     if (validMoves.some(m => m.r === r && m.c === c)) {
-                        if (board[r][c]) { playSound(150, 'triangle', 0.2, 0.3); board[r][c] = null; } else playSound(300, 'sine', 0.1, 0.2);
                         board[r][c] = { ...board[selectedPiece.r][selectedPiece.c], moved: true }; board[selectedPiece.r][selectedPiece.c] = null;
                         selectedPiece = { r, c, ...board[r][c] }; gameState = 'shooting_phase';
                         validMoves = []; validShoots = getMoves(r, c, selectedPiece.type, selectedPiece.color, true);
@@ -235,7 +237,12 @@
             render();
         }
 
-        function copyId() { const id = document.getElementById('my-id').innerText; navigator.clipboard.writeText(id); alert("ID скопирован!"); }
+        function copyInviteLink() {
+            const id = document.getElementById('my-id').innerText;
+            const url = window.location.origin + window.location.pathname + "?join=" + id;
+            navigator.clipboard.writeText(url);
+            alert("Ссылка скопирована! Отправь её другу.");
+        }
 
         initNetwork();
     </script>

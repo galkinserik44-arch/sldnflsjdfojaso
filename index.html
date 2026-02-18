@@ -3,94 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TURRET CHESS v13.5 - STABLE</title>
+    <title>TURRET CHESS ONLINE v14.0 - FULL SYNC</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #1a1a1a; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #lobby { background: #000; padding: 30px; border-radius: 15px; text-align: center; border: 2px solid #4caf50; width: 280px; }
-        #game-ui { display: none; flex-direction: column; align-items: center; }
-        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); background: #444; border: 2px solid #333; max-width: 480px; max-height: 480px; }
-        @media (min-width: 500px) { #board { grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); } .cell { width: 60px !important; height: 60px !important; } }
-        .cell { width: 11vw; height: 11vw; display: flex; align-items: center; justify-content: center; font-size: 30px; cursor: pointer; position: relative; }
+        #lobby { background: #000; padding: 25px; border-radius: 15px; text-align: center; border: 2px solid #4caf50; width: 300px; box-shadow: 0 0 50px rgba(0,0,0,1); }
+        #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; }
+        #board { display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); background: #444; position: relative; border: 5px solid #333; }
+        @media (max-width: 500px) { #board { grid-template-columns: repeat(8, 11.5vw); grid-template-rows: repeat(8, 11.5vw); } .cell { width: 11.5vw !important; height: 11.5vw !important; font-size: 28px !important; } }
+        .cell { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; position: relative; z-index: 1; transition: background 0.2s; }
         .white-cell { background: #eeeed2; color: #333; }
         .black-cell { background: #769656; color: #fff; }
-        .piece-white { color: #fff; text-shadow: 1px 1px #000; }
-        .piece-black { color: #000; text-shadow: 0px 0px 1px #fff; }
+        .piece-white { color: #fff; text-shadow: 2px 2px #000; }
+        .piece-black { color: #000; text-shadow: 0px 0px 2px #fff; }
         .selected { background: #f6f669 !important; }
         .valid-move::after { content: ''; width: 12px; height: 12px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; }
-        .valid-shoot { background: #ff5252 !important; }
-        .hp-bar { position: absolute; top: 1px; left: 2px; right: 2px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
-        .hp-fill { height: 100%; background: #0f0; }
-        .btn { background: #4caf50; border: none; color: white; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 8px; width: 100%; text-transform: uppercase; margin-top: 10px; }
-        #status-bar { margin-bottom: 10px; font-weight: bold; }
-        #debug { font-size: 10px; color: #666; margin-top: 15px; height: 20px; }
+        .valid-shoot { background: #ff5252 !important; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+        .hp-bar { position: absolute; top: 1px; left: 3px; right: 3px; height: 4px; background: #333; border: 1px solid #000; border-radius: 2px; overflow: hidden; pointer-events: none; }
+        .hp-fill { height: 100%; background: #0f0; transition: width 0.3s; }
+        .btn { background: #4caf50; border: none; color: white; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 8px; width: 100%; text-transform: uppercase; margin-top: 10px; box-shadow: 0 4px #2e7d32; }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px #2e7d32; }
+        #status-bar { font-size: 18px; margin-bottom: 10px; font-weight: bold; padding: 5px 15px; border-radius: 5px; }
+        .fx-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; }
+        .bullet { position: absolute; width: 10px; height: 10px; background: #ff0; border-radius: 50%; box-shadow: 0 0 15px #f90; }
+        .explosion { position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, #f90, transparent); border-radius: 50%; animation: explode 0.3s ease-out forwards; }
+        @keyframes explode { 0% { transform: scale(0.1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
     </style>
 </head>
 <body>
+
     <div id="lobby">
         <h2 style="margin:0">TURRET CHESS</h2>
-        <div id="lobby-status" style="font-size:12px; margin:10px 0; color:#ffeb3b">Запуск...</div>
+        <div id="lobby-status" style="font-size:12px; margin:10px 0; color:#ffeb3b">СИНХРОНИЗАЦИЯ...</div>
         <div id="id-box" style="display:none">
-            <div id="my-id" style="font-weight:bold; font-size:18px; color:#4caf50; background:#222; padding:10px; margin:10px 0; border-radius:5px;">----</div>
-            <button class="btn" style="background:#ff9800" onclick="copyInvite()">СКОПИРОВАТЬ ССЫЛКУ</button>
-            <p style="font-size:10px; color:#555">Или введи ID друга ниже:</p>
-            <input type="text" id="target-id" placeholder="ID друга" style="padding:10px; width:80%; text-align:center; background:#333; color:#fff; border:none; border-radius:5px;">
-            <button class="btn" style="background:#2196f3" onclick="joinRoom()">ПОДКЛЮЧИТЬСЯ</button>
+            <div id="my-id" style="font-weight:bold; font-size:16px; color:#4caf50; background:#222; padding:10px; margin:10px 0; border-radius:5px; word-break: break-all;">----</div>
+            <button class="btn" style="background:#ff9800" onclick="copyInvite()">КОПИРОВАТЬ ССЫЛКУ</button>
+            <div style="margin: 15px 0; height: 1px; background: #333;"></div>
+            <input type="text" id="target-id" placeholder="ID друга" style="padding:10px; width:80%; text-align:center; background:#333; color:#fff; border:none; border-radius:5px; margin-bottom:10px;">
+            <button class="btn" style="background:#2196f3" onclick="joinRoom()">ИГРАТЬ</button>
         </div>
-        <div id="debug"></div>
     </div>
 
     <div id="game-ui">
-        <div id="status-bar">Ход белых</div>
-        <div id="board" oncontextmenu="return false;"></div>
-        <div style="margin-top:10px; font-size:10px; color:#666">ЛКМ: Ход+Стрелять | ПКМ: Только стрелять</div>
+        <div id="status-bar">ОЖИДАНИЕ...</div>
+        <div id="game-container">
+            <div id="board" oncontextmenu="return false;"></div>
+            <div id="fx-layer" class="fx-layer"></div>
+        </div>
+        <div style="margin-top:10px; font-size:10px; color:#666">ЛКМ: ХОД | ПКМ: ВЫСТРЕЛ</div>
     </div>
 
     <script>
         const stats = { p:{hp:2,d:1}, r:{hp:7,d:3}, n:{hp:4,d:2}, b:{hp:4,d:2}, q:{hp:10,d:3}, k:{hp:15,d:1} };
         let board=[], sel=null, moves=[], shoots=[], turn='white', myCol=null, peer, conn;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        function log(m) { document.getElementById('debug').innerText = m; }
+        function play(f,t,d,v=0.1){
+            try{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=t;o.frequency.setValueAtTime(f,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(10,audioCtx.currentTime+d);g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d);}catch(e){}
+        }
 
         function init() {
-            peer = new Peer({ config: {'iceServers': [
-                {urls:'stun:stun.l.google.com:19302'}, {urls:'stun:stun1.l.google.com:19302'},
-                {urls:'stun:stun2.l.google.com:19302'}, {urls:'stun:stun.services.mozilla.com'}
-            ]}});
+            peer = new Peer({ config: {'iceServers': [{urls:'stun:stun.l.google.com:19302'}, {urls:'stun:stun1.l.google.com:19302'}]}});
             peer.on('open', id => {
-                document.getElementById('lobby-status').innerText = "Сеть готова";
+                document.getElementById('lobby-status').innerText = "СЕТЬ ГОТОВА";
                 document.getElementById('my-id').innerText = id;
                 document.getElementById('id-box').style.display = 'block';
                 const urlId = new URLSearchParams(window.location.search).get('join');
                 if (urlId) { document.getElementById('target-id').value = urlId; joinRoom(); }
             });
             peer.on('connection', c => {
-                conn = c; myCol = 'white'; setupConn(); log("Друг вошел!"); start();
+                if(conn) return;
+                conn = c; myCol = 'white'; setupConn();
             });
         }
 
         function joinRoom() {
             const id = document.getElementById('target-id').value.trim();
             if(!id) return;
-            log("Подключение...");
-            conn = peer.connect(id, {reliable:false});
+            conn = peer.connect(id);
             myCol = 'black';
-            conn.on('open', () => { setupConn(); log("Успех!"); start(); });
+            setupConn();
         }
 
         function setupConn() {
+            conn.on('open', () => {
+                document.getElementById('lobby').style.display='none';
+                document.getElementById('game-ui').style.display='flex';
+                initBoard();
+                render();
+                if(myCol === 'white') sync();
+            });
             conn.on('data', d => {
-                if(d.type==='sync') { board=d.board; turn=d.turn; render(); }
+                if(d.type === 'action') {
+                    handleRemoteAction(d);
+                } else if(d.type === 'sync') {
+                    board = d.board; turn = d.turn; render();
+                }
             });
         }
 
-        function start() {
-            document.getElementById('lobby').style.display='none';
-            document.getElementById('game-ui').style.display='flex';
-            if(board.length===0) initBoard();
+        async function handleRemoteAction(d) {
+            if(d.move) {
+                play(300, 'sine', 0.1);
+                board[d.move.toR][d.move.toC] = board[d.move.fromR][d.move.fromC];
+                board[d.move.fromR][d.move.fromC] = null;
+                board[d.move.toR][d.move.toC].m = 1;
+            }
+            if(d.shoot) {
+                await shootFX(d.shoot.fromR, d.shoot.fromC, d.shoot.toR, d.shoot.toC);
+                board[d.shoot.toR][d.shoot.toC].hp -= d.shoot.dmg;
+                if(board[d.shoot.toR][d.shoot.toC].hp <= 0) board[d.shoot.toR][d.shoot.toC] = null;
+            }
+            turn = d.nextTurn;
             render();
-            if(myCol==='white') sync();
         }
+
+        function sync() { if(conn && conn.open) conn.send({type:'sync', board, turn}); }
 
         function initBoard() {
             board = Array(8).fill().map(() => Array(8).fill(null));
@@ -101,8 +129,10 @@
 
         function render() {
             const el = document.getElementById('board'); el.innerHTML = '';
+            const isMyTurn = (turn === myCol);
             const rIdx = myCol==='black' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
             const cIdx = myCol==='black' ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+            
             for(let r of rIdx) {
                 for(let c of cIdx) {
                     const cell = document.createElement('div');
@@ -113,21 +143,23 @@
                         cell.classList.add('piece-'+p.c);
                         const hb = document.createElement('div'); hb.className='hp-bar';
                         const hf = document.createElement('div'); hf.className='hp-fill';
-                        hf.style.width = (p.hp/stats[p.t].hp*100)+'%';
-                        hb.appendChild(hf); cell.appendChild(hb);
+                        hf.style.width = (p.hp/stats[p.t].hp*100)+'%'; hb.appendChild(hf); cell.appendChild(hb);
                     }
-                    cell.onmousedown = (e) => handleClick(r,c,e);
+                    cell.onmousedown = (e) => { if(audioCtx.state==='suspended') audioCtx.resume(); handleClick(r,c,e); };
                     if(sel && sel.r===r && sel.c===c) cell.classList.add('selected');
                     if(moves.some(m=>m.r===r&&m.c===c)) cell.classList.add('valid-move');
                     if(shoots.some(m=>m.r===r&&m.c===c)) cell.classList.add('valid-shoot');
                     el.appendChild(cell);
                 }
             }
-            document.getElementById('status-bar').innerText = turn===myCol ? "ТВОЙ ХОД" : "ХОД ВРАГА";
+            const sb = document.getElementById('status-bar');
+            sb.innerText = isMyTurn ? "ТВОЙ ХОД" : "ХОД ПРОТИВНИКА";
+            sb.style.background = turn === 'white' ? '#eee' : '#333';
+            sb.style.color = turn === 'white' ? '#000' : '#fff';
         }
 
-        function handleClick(r,c,e) {
-            if(turn!==myCol) return;
+        async function handleClick(r,c,e) {
+            if(turn !== myCol) return;
             const p = board[r][c];
             if(!sel) {
                 if(p && p.c===turn) {
@@ -139,13 +171,27 @@
                 const move = moves.find(m=>m.r===r&&m.c===c);
                 const shoot = shoots.find(s=>s.r===r&&s.c===c);
                 if(move) {
+                    const action = { type:'action', move: {fromR:sel.r, fromC:sel.c, toR:r, toC:c}, nextTurn: turn };
+                    // Local update
+                    play(300, 'sine', 0.1);
                     board[r][c] = {...board[sel.r][sel.c], m:1}; board[sel.r][sel.c]=null;
                     sel={r,c}; moves=[]; shoots=getMoves(r,c,true);
-                    if(shoots.length===0) end();
+                    if(shoots.length === 0) {
+                        action.nextTurn = turn==='white'?'black':'white';
+                        turn = action.nextTurn; sel=null;
+                    } else {
+                        // Still my turn, but moved. Wait for shoot or skip.
+                    }
+                    if(conn) conn.send(action);
                 } else if(shoot) {
-                    board[r][c].hp -= stats[board[sel.r][sel.c].t].d;
+                    const dmg = stats[board[sel.r][sel.c].t].d;
+                    const action = { type:'action', shoot: {fromR:sel.r, fromC:sel.c, toR:r, toC:c, dmg: dmg}, nextTurn: turn==='white'?'black':'white' };
+                    // Local FX
+                    await shootFX(sel.r, sel.c, r, c);
+                    board[r][c].hp -= dmg;
                     if(board[r][c].hp<=0) board[r][c]=null;
-                    end();
+                    turn = action.nextTurn; sel=null; moves=[]; shoots=[];
+                    if(conn) conn.send(action);
                 } else { sel=null; moves=[]; shoots=[]; }
             }
             render();
@@ -177,11 +223,39 @@
             return res;
         }
 
-        function end() { turn=turn==='white'?'black':'white'; sel=null; moves=[]; shoots=[]; sync(); }
-        function sync() { if(conn && conn.open) conn.send({type:'sync', board, turn}); }
+        async function shootFX(fr, fc, tr, tc) {
+            const layer = document.getElementById('fx-layer');
+            const rect = document.getElementById('board').getBoundingClientRect();
+            const cw = rect.width / 8;
+            function getCoords(r, c) {
+                let dr = myCol === 'black' ? r : 7-r;
+                let dc = myCol === 'black' ? 7-c : c;
+                return { x: dc * cw + cw/2, y: dr * cw + cw/2 };
+            }
+            const s = getCoords(fr, fc), e = getCoords(tr, tc);
+            const b = document.createElement('div'); b.className = 'bullet'; b.style.left = s.x+'px'; b.style.top = s.y+'px';
+            layer.appendChild(b);
+            play(400, 'sawtooth', 0.1);
+            const start = performance.now();
+            return new Promise(res => {
+                function anim(t) {
+                    const p = Math.min((t-start)/300, 1);
+                    b.style.left = s.x + (e.x-s.x)*p+'px'; b.style.top = s.y + (e.y-s.y)*p+'px';
+                    if (p<1) requestAnimationFrame(anim);
+                    else {
+                        b.remove(); const ex = document.createElement('div'); ex.className = 'explosion';
+                        ex.style.left = (e.x-25)+'px'; ex.style.top = (e.y-25)+'px';
+                        layer.appendChild(ex); play(100, 'square', 0.2, 0.2);
+                        setTimeout(() => { ex.remove(); res(); }, 300);
+                    }
+                }
+                requestAnimationFrame(anim);
+            });
+        }
+
         function copyInvite() {
             const url = window.location.origin + window.location.pathname + "?join=" + document.getElementById('my-id').innerText;
-            navigator.clipboard.writeText(url); alert("Ссылка скопирована!");
+            navigator.clipboard.writeText(url); alert("ССЫЛКА СКОПИРОВАНА!");
         }
 
         init();

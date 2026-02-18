@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURRET CHESS ONLINE v12.0</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body {
+            background: #1a1a1a; color: #fff; font-family: 'Arial', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; margin: 0; overflow: hidden;
+        }
+        #net-ui {
+            background: rgba(0,0,0,0.8); padding: 10px; border-radius: 10px; margin-bottom: 10px;
+            display: flex; gap: 10px; align-items: center; font-size: 14px;
+        }
+        #game-container { position: relative; border: 5px solid #444; box-shadow: 0 0 50px rgba(0,0,0,0.5); display: flex; }
+        #board {
+            display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px);
+            background: #444; position: relative;
+        }
+        @media (max-width: 500px) {
+            #board { grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); }
+            .cell { width: 11vw !important; height: 11vw !important; font-size: 30px !important; }
+        }
+        .cell {
+            width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
+            font-size: 40px; cursor: pointer; position: relative; transition: all 0.1s; z-index: 1;
+        }
+        .white-cell { background: #eeeed2; color: #333; }
+        .black-cell { background: #769656; color: #fff; }
+        .piece-white { color: #fff; text-shadow: 2px 2px #000; }
+        .piece-black { color: #000; text-shadow: 0px 0px 2px #fff; }
+        .selected { background: #f6f669 !important; }
+        .valid-move::after {
+            content: ''; width: 15px; height: 15px; background: rgba(0,0,0,0.2); border-radius: 50%;
+            position: absolute;
+        }
+        .valid-shoot { background: #ff5252 !important; box-shadow: inset 0 0 15px rgba(255, 0, 85, 0.4); }
+        
+        .hp-bar {
+            position: absolute; top: 2px; left: 5px; right: 5px; height: 4px;
+            background: #333; border: 1px solid #000; border-radius: 2px; overflow: hidden; pointer-events: none;
+        }
+        .hp-fill { height: 100%; background: #00ff00; transition: width 0.3s; }
+        
+        #ui { margin-top: 10px; text-align: center; width: 100%; max-width: 500px; }
+        .btn {
+            background: #4caf50; border: none; color: white; padding: 8px 12px;
+            font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px;
+        }
+        .btn.blue { background: #2196f3; }
+        .btn.red { background: #f44336; }
+        .turn-info { font-size: 18px; margin-bottom: 5px; font-weight: 900; }
+        
+        /* FX */
+        .fx-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; }
+        .bullet {
+            position: absolute; width: 8px; height: 8px; background: yellow;
+            border-radius: 50%; box-shadow: 0 0 10px orange;
+        }
+        .explosion {
+            position: absolute; width: 50px; height: 50px;
+            background: radial-gradient(circle, orange, transparent);
+            border-radius: 50%; animation: explode 0.4s ease-out forwards;
+        }
+        @keyframes explode { 0% { transform: scale(0.1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div id="net-ui">
+        <div id="my-id-display">Загрузка сети...</div>
+        <input type="text" id="join-id" placeholder="ID друга" style="width:100px; padding:5px;">
+        <button class="btn blue" onclick="connectToPeer()">Играть</button>
+    </div>
+
+    <div class="turn-info" id="turn-display">ЗАГРУЗКА...</div>
+    <div id="game-container">
+        <div id="board" oncontextmenu="return false;"></div>
+        <div id="fx-layer" class="fx-layer"></div>
+    </div>
+    <div id="ui">
+        <button class="btn" onclick="undo()">↩</button>
+        <button class="btn red" onclick="resetGame()">RESET</button>
+        <div id="status" style="font-size:11px; color:#aaa; margin-top:5px">ЛКМ: Ход | ПКМ: Выстрел</div>
+    </div>
+
+    <script>
+        const boardSize = 8;
+        let board = [];
+        let selectedPiece = null;
+        let validMoves = [];
+        let validShoots = [];
+        let turn = 'white';
+        let gameState = 'select';
+        let myColor = null; // Будет 'white' или 'black'
+        let peer, conn;
+
+        const pieceIcons = {
+            white: { p: '♙', r: '♖', n: '♘', b: '♗', q: '♕', k: '♔' },
+            black: { p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚' }
+        };
+
+        const pieceStats = {
+            p: { hp: 2, damage: 1 }, r: { hp: 7, damage: 3 }, n: { hp: 4, damage: 2 },
+            b: { hp: 4, damage: 2 }, q: { hp: 10, damage: 3 }, k: { hp: 15, damage: 1 }
+        };
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(freq, type, duration, volume = 0.1) {
+            try {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + duration);
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
+            } catch(e){}
+        }
+
+        // NETWORK LOGIC
+        function initNetwork() {
+            peer = new Peer();
+            peer.on('open', (id) => {
+                document.getElementById('my-id-display').innerText = "Твой ID: " + id;
+                console.log('My peer ID is: ' + id);
+            });
+            peer.on('connection', (c) => {
+                conn = c;
+                myColor = 'white';
+                setupConn();
+                alert("Друг подключился! Ты играешь за БЕЛЫХ.");
+            });
+        }
+
+        function connectToPeer() {
+            const id = document.getElementById('join-id').value;
+            if (!id) return;
+            conn = peer.connect(id);
+            myColor = 'black';
+            setupConn();
+            alert("Подключено! Ты играешь за ЧЕРНЫХ.");
+        }
+
+        function setupConn() {
+            conn.on('data', (data) => {
+                if (data.type === 'move') {
+                    applyRemoteMove(data);
+                } else if (data.type === 'sync') {
+                    board = data.board; turn = data.turn; gameState = data.gameState; render();
+                }
+            });
+            setInterval(() => { if(conn) conn.send({type:'sync', board, turn, gameState}); }, 2000);
+        }
+
+        function applyRemoteMove(data) {
+            // Визуализация выстрела если он был
+            if (data.shoot) {
+                shootFX(data.shoot.fromR, data.shoot.fromC, data.shoot.toR, data.shoot.toC).then(() => {
+                    board = data.board; turn = data.turn; gameState = data.gameState; render();
+                });
+            } else {
+                board = data.board; turn = data.turn; gameState = data.gameState; render();
+            }
+        }
+
+        function sendMove(shootData = null) {
+            if (conn) {
+                conn.send({
+                    type: 'move',
+                    board: board,
+                    turn: turn,
+                    gameState: gameState,
+                    shoot: shootData
+                });
+            }
+        }
+
+        // GAME LOGIC
+        function initGame() {
+            board = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+            for (let i = 0; i < 8; i++) {
+                board[1][i] = { type: 'p', color: 'black', hp: 2, moved: false };
+                board[6][i] = { type: 'p', color: 'white', hp: 2, moved: false };
+            }
+            const layout = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+            layout.forEach((p, i) => {
+                board[0][i] = { type: p, color: 'black', hp: pieceStats[p].hp, moved: false };
+                board[7][i] = { type: p, color: 'white', hp: pieceStats[p].hp, moved: false };
+            });
+            render();
+        }
+
+        function render() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            const cellSize = boardEl.offsetWidth / 8;
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = `cell ${(r + c) % 2 === 0 ? 'white-cell' : 'black-cell'}`;
+                    const piece = board[r][c];
+                    if (piece) {
+                        cell.innerText = pieceIcons[piece.color][piece.type];
+                        cell.classList.add(piece.color === 'white' ? 'piece-white' : 'piece-black');
+                        const hpBar = document.createElement('div');
+                        hpBar.className = 'hp-bar';
+                        const hpFill = document.createElement('div');
+                        hpFill.className = 'hp-fill';
+                        hpFill.style.width = (piece.hp / pieceStats[piece.type].hp * 100) + '%';
+                        hpBar.appendChild(hpFill);
+                        cell.appendChild(hpBar);
+                    }
+                    cell.onmousedown = (e) => handleCellClick(r, c, e);
+                    if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) cell.classList.add('selected');
+                    if (validMoves.some(m => m.r === r && m.c === c)) cell.classList.add('valid-move');
+                    if (validShoots.some(m => m.r === r && m.c === c)) cell.classList.add('valid-shoot');
+                    boardEl.appendChild(cell);
+                }
+            }
+            document.getElementById('turn-display').innerText = `ХОД ${turn === 'white' ? 'БЕЛЫХ' : 'ЧЕРНЫХ'}` + (myColor ? ` (ТЫ: ${myColor === 'white' ? 'БЕЛЫЕ' : 'ЧЕРНЫЕ'})` : "");
+        }
+
+        function getMoves(r, c, type, color, isShoot = false) {
+            let moves = []; const dir = color === 'white' ? -1 : 1;
+            if (type === 'p') {
+                if (!isShoot) {
+                    if (board[r+dir] && !board[r+dir][c]) {
+                        moves.push({r: r+dir, c});
+                        if (!board[r][c].moved && board[r+2*dir] && !board[r+2*dir][c]) moves.push({r: r+2*dir, c});
+                    }
+                    [[dir,1],[dir,-1]].forEach(d => {
+                        let nr=r+d[0], nc=c+d[1];
+                        if (board[nr] && board[nr][nc] && board[nr][nc].color !== color && board[nr][nc].type !== 'k') moves.push({r: nr, c: nc});
+                    });
+                } else {
+                    [[dir,1],[dir,-1]].forEach(d => {
+                        let nr=r+d[0], nc=c+d[1];
+                        if (board[nr] && board[nr][nc] && board[nr][nc].color !== color) moves.push({r: nr, c: nc});
+                    });
+                }
+            } else if (type === 'n') {
+                [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(d => {
+                    let nr=r+d[0], nc=c+d[1];
+                    if (board[nr] && board[nr][nc] !== undefined) {
+                        if (!board[nr][nc] || (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k'))) moves.push({r: nr, c: nc});
+                    }
+                });
+            } else if (type === 'r' || type === 'b' || type === 'q') {
+                const dirs = type === 'r' ? [[0,1],[0,-1],[1,0],[-1,0]] : 
+                             type === 'b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : 
+                             [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+                dirs.forEach(d => {
+                    for(let i=1; i<8; i++) {
+                        let nr=r+d[0]*i, nc=c+d[1]*i;
+                        if (nr<0 || nr>=8 || nc<0 || nc>=8) break;
+                        if (!board[nr][nc]) { if (!isShoot) moves.push({r: nr, c: nc}); }
+                        else { 
+                            if (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k')) moves.push({r: nr, c: nc});
+                            break; 
+                        }
+                    }
+                });
+            } else if (type === 'k') {
+                for(let dr=-1; dr<=1; dr++) {
+                    for(let dc=-1; dc<=1; dc++) {
+                        if (dr===0 && dc===0) continue;
+                        let nr=r+dr, nc=c+dc;
+                        if (board[nr] && board[nr][nc] !== undefined) {
+                            if (!board[nr][nc] || (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k'))) moves.push({r: nr, c: nc});
+                        }
+                    }
+                }
+            }
+            return moves;
+        }
+
+        async function shootFX(fromR, fromC, toR, toC) {
+            const layer = document.getElementById('fx-layer');
+            const boardEl = document.getElementById('board');
+            const bullet = document.createElement('div'); bullet.className = 'bullet';
+            const rect = boardEl.getBoundingClientRect();
+            const cellW = rect.width / 8;
+            const startX = fromC * cellW + cellW/2; const startY = fromR * cellW + cellW/2;
+            const endX = toC * cellW + cellW/2; const endY = toR * cellW + cellW/2;
+            bullet.style.left = startX + 'px'; bullet.style.top = startY + 'px';
+            layer.appendChild(bullet); playSound(400, 'sawtooth', 0.1);
+            const duration = 300; const startTime = performance.now();
+            return new Promise(resolve => {
+                function animate(time) {
+                    const progress = Math.min((time - startTime) / duration, 1);
+                    bullet.style.left = startX + (endX - startX) * progress + 'px';
+                    bullet.style.top = startY + (endY - startY) * progress + 'px';
+                    if (progress < 1) requestAnimationFrame(animate);
+                    else {
+                        bullet.remove(); const explosion = document.createElement('div');
+                        explosion.className = 'explosion'; explosion.style.left = toC * cellW + 'px'; explosion.style.top = toR * cellW + 'px';
+                        layer.appendChild(explosion); playSound(100, 'square', 0.3, 0.2);
+                        setTimeout(() => { explosion.remove(); resolve(); }, 400);
+                    }
+                }
+                requestAnimationFrame(animate);
+            });
+        }
+
+        async function handleCellClick(r, c, e) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (myColor && turn !== myColor) return; // Не твой ход
+
+            const piece = board[r][c];
+            if (gameState === 'select') {
+                if (piece && piece.color === turn) {
+                    selectedPiece = { r, c, ...piece };
+                    if (e.button === 0) { // LEFT: Move
+                        validMoves = getMoves(r, c, piece.type, piece.color, false); validShoots = [];
+                    } else { // RIGHT: Shoot Only
+                        validShoots = getMoves(r, c, piece.type, piece.color, true); validMoves = [];
+                    }
+                    render();
+                } else if (selectedPiece) {
+                    if (validMoves.some(m => m.r === r && m.c === c)) {
+                        if (board[r][c]) board[r][c] = null;
+                        board[r][c] = { ...board[selectedPiece.r][selectedPiece.c], moved: true };
+                        board[selectedPiece.r][selectedPiece.c] = null;
+                        selectedPiece = { r, c, ...board[r][c] };
+                        gameState = 'shooting_phase';
+                        validMoves = []; validShoots = getMoves(r, c, selectedPiece.type, selectedPiece.color, true);
+                        if (validShoots.length === 0) endTurn();
+                        else render();
+                    } else if (validShoots.some(m => m.r === r && m.c === c)) {
+                        const target = board[r][c];
+                        const sData = { fromR: selectedPiece.r, fromC: selectedPiece.c, toR: r, toC: c };
+                        await shootFX(sData.fromR, sData.fromC, sData.toR, sData.toC);
+                        target.hp -= pieceStats[selectedPiece.type].damage;
+                        if (target.hp <= 0) board[r][c] = null;
+                        endTurn(sData);
+                    } else { selectedPiece = null; validMoves = []; validShoots = []; render(); }
+                }
+            } else if (gameState === 'shooting_phase') {
+                if (validShoots.some(m => m.r === r && m.c === c)) {
+                    const target = board[r][c];
+                    const sData = { fromR: selectedPiece.r, fromC: selectedPiece.c, toR: r, toC: c };
+                    await shootFX(sData.fromR, sData.fromC, sData.toR, sData.toC);
+                    target.hp -= pieceStats[selectedPiece.type].damage;
+                    if (target.hp <= 0) board[r][c] = null;
+                    endTurn(sData);
+                } else endTurn();
+            }
+        }
+
+        function endTurn(shootData = null) {
+            selectedPiece = null; validMoves = []; validShoots = []; gameState = 'select';
+            turn = turn === 'white' ? 'black' : 'white';
+            sendMove(shootData);
+            render();
+        }
+
+        function resetGame() { if(conn) conn.send({type:'sync', board:[], turn:'white'}); initGame(); }
+
+        initGame(); initNetwork();
+    </script>
+</body>
+</html>

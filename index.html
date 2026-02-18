@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TURRET CHESS ONLINE v17.0 - REMATCH & LOCK</title>
+    <title>TURRET CHESS v17.1 - STABLE</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #111; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
@@ -29,10 +29,8 @@
         .bullet { position: absolute; width: 10px; height: 10px; background: #ff0; border-radius: 50%; box-shadow: 0 0 15px #f90; margin-left: -5px; margin-top: -5px; }
         .explosion { position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, #f90, transparent); border-radius: 50%; animation: explode 0.3s ease-out forwards; margin-left: -25px; margin-top: -25px; }
         @keyframes explode { 0% { transform: scale(0.1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
-        
-        /* Modal for Rematch */
-        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
-        #modal-box { background: #222; padding: 30px; border-radius: 15px; border: 2px solid #4caf50; text-align: center; }
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
+        #modal-box { background: #222; padding: 40px; border-radius: 15px; border: 3px solid #4caf50; text-align: center; }
     </style>
 </head>
 <body>
@@ -41,11 +39,11 @@
         <h2 style="margin:0">TURRET CHESS</h2>
         <div id="lobby-status" style="font-size:12px; margin:10px 0; color:#ffeb3b">СЕТЬ: ЗАПУСК...</div>
         <div id="id-box" style="display:none">
-            <div id="my-id" style="font-weight:bold; font-size:16px; color:#4caf50; background:#222; padding:10px; border-radius:5px; margin:10px 0; word-break: break-all;">----</div>
-            <button class="btn" style="background:#ff9800" onclick="copyInvite()">ССЫЛКА ДЛЯ ДРУГА</button>
+            <div id="my-id" onclick="copyInvite()" style="cursor:pointer; font-weight:bold; font-size:16px; color:#4caf50; background:#222; padding:10px; border-radius:5px; margin:10px 0; word-break: break-all;">----</div>
+            <button class="btn" style="background:#ff9800" onclick="copyInvite()">СКОПИРОВАТЬ ССЫЛКУ</button>
             <div style="margin: 15px 0; height: 1px; background: #333;"></div>
             <input type="text" id="target-id" placeholder="ID друга" style="padding:10px; width:80%; text-align:center; background:#333; color:#fff; border:none; border-radius:5px; margin-bottom:10px;">
-            <button class="btn" style="background:#2196f3" onclick="joinRoom()">ПОДКЛЮЧИТЬСЯ</button>
+            <button class="btn" style="background:#2196f3" onclick="joinRoom()">ИГРАТЬ</button>
         </div>
     </div>
 
@@ -55,12 +53,13 @@
             <div id="board" oncontextmenu="return false;"></div>
             <div id="fx-layer" class="fx-layer"></div>
         </div>
-        <div style="margin-top:10px; font-size:11px; color:#aaa">ЛКМ: ХОД | ПКМ: ВЫСТРЕЛ</div>
+        <button id="skip-shoot" class="btn" style="display:none; background:#ff5252;" onclick="skipShoot()">ЗАВЕРШИТЬ ХОД</button>
+        <div style="margin-top:10px; font-size:10px; color:#666">ЛКМ: ХОД | ПКМ: ВЫСТРЕЛ</div>
     </div>
 
     <div id="modal">
         <div id="modal-box">
-            <h1 id="winner-text">КТО-ТО ВЫИГРАЛ</h1>
+            <h1 id="winner-text">ПОБЕДА!</h1>
             <button id="rematch-btn" class="btn" onclick="requestRematch()">РЕВАНШ</button>
             <div id="rematch-status" style="font-size:12px; margin-top:10px; color:#aaa"></div>
         </div>
@@ -69,8 +68,7 @@
     <script>
         const stats = { p:{hp:2,d:1}, r:{hp:7,d:3}, n:{hp:4,d:2}, b:{hp:4,d:2}, q:{hp:10,d:3}, k:{hp:15,d:1} };
         const icons = { white: { p: '♙', r: '♖', n: '♘', b: '♗', q: '♕', k: '♔' }, black: { p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚' } };
-        let board=[], sel=null, moves=[], shoots=[], turn='white', myCol=null, peer, conn, isProcessing = false;
-        let phase = 'select'; // select, moved
+        let board=[], sel=null, moves=[], shoots=[], turn='white', myCol=null, peer, conn, isProcessing = false, gamePhase = 'select';
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function play(f,t,d,v=0.1){ try{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=t;o.frequency.setValueAtTime(f,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(10,audioCtx.currentTime+d);g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d);}catch(e){} }
@@ -84,12 +82,11 @@
         function joinRoom() { const id = document.getElementById('target-id').value.trim(); if(!id) return; conn = peer.connect(id); myCol = 'black'; setupConn(); }
 
         function setupConn() {
-            conn.on('open', () => { document.getElementById('lobby').style.display='none'; document.getElementById('game-ui').style.display='flex'; initBoard(); render(); if(myCol === 'white') sync(); });
+            conn.on('open', () => { document.getElementById('lobby').style.display='none'; document.getElementById('game-ui').style.display='flex'; startNewGame(); });
             conn.on('data', d => { 
                 if(d.type === 'action') handleRemoteAction(d); 
-                if(d.type === 'sync') { board = d.board; turn = d.turn; render(); }
-                if(d.type === 'REMATCH_REQ') { if(confirm("Противник предлагает реванш. Принять?")) { conn.send({type:'REMATCH_ACCEPT'}); startNewGame(); } }
-                if(d.type === 'REMATCH_ACCEPT') { startNewGame(); }
+                if(d.type === 'REMATCH_REQ') { if(confirm("Противник хочет реванш!")) { conn.send({type:'REMATCH_ACCEPT'}); startNewGame(); } }
+                if(d.type === 'REMATCH_ACCEPT') startNewGame();
             });
         }
 
@@ -106,32 +103,24 @@
             }
             if(d.shoot) {
                 await shootFX(d.shoot.fR, d.shoot.fC, d.shoot.tR, d.shoot.tC);
-                const target = board[d.shoot.tR][d.shoot.tC];
-                if(target) { target.hp -= d.shoot.dmg; if(target.hp <= 0) { const isKing = target.t === 'k'; board[d.shoot.tR][d.shoot.tC] = null; if(isKing) checkWin(); } }
+                if(board[d.shoot.tR][d.shoot.tC]) { board[d.shoot.tR][d.shoot.tC].hp -= d.shoot.dmg; if(board[d.shoot.tR][d.shoot.tC].hp <= 0) { const ik = board[d.shoot.tR][d.shoot.tC].t==='k'; board[d.shoot.tR][d.shoot.tC]=null; if(ik) checkWin(); } }
             }
             turn = d.nextTurn; isProcessing = false; render();
         }
 
-        function initBoard() {
-            board = Array(8).fill().map(() => Array(8).fill(null));
-            for(let i=0;i<8;i++) { board[1][i]={t:'p',c:'black',hp:2,m:false}; board[6][i]={t:'p',c:'white',hp:2,m:false}; }
-            const l=['r','n','b','q','k','b','n','r'];
-            l.forEach((p,i)=>{ board[0][i]={t:p,c:'black',hp:stats[p].hp,m:false}; board[7][i]={t:p,c:'white',hp:stats[p].hp,m:false}; });
-            turn = 'white'; phase = 'select';
-        }
+        function startNewGame() { board = Array(8).fill().map(() => Array(8).fill(null)); for(let i=0;i<8;i++){ board[1][i]={t:'p',c:'black',hp:2,m:false}; board[6][i]={t:'p',c:'white',hp:2,m:false}; } const l=['r','n','b','q','k','b','n','r']; l.forEach((p,i)=>{ board[0][i]={t:p,c:'black',hp:stats[p].hp,m:false}; board[7][i]={t:p,c:'white',hp:stats[p].hp,m:false}; }); turn='white'; gamePhase='select'; isProcessing=false; sel=null; document.getElementById('modal').style.display='none'; render(); }
 
         function render() {
             const el = document.getElementById('board'); el.innerHTML = '';
-            const rows = myCol === 'white' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
-            const cols = myCol === 'white' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
+            // POV
+            const rows = myCol === 'black' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
+            const cols = myCol === 'black' ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
             for(let r of rows) {
                 for(let c of cols) {
-                    const cell = document.createElement('div');
-                    cell.className = `cell ${(r+c)%2===0?'white-cell':'black-cell'}`;
+                    const cell = document.createElement('div'); cell.className = `cell ${(r+c)%2===0?'white-cell':'black-cell'}`;
                     const p = board[r][c];
                     if(p) {
-                        cell.innerText = icons[p.c][p.t];
-                        cell.classList.add('piece-'+p.c);
+                        cell.innerText = icons[p.c][p.t]; cell.classList.add('piece-'+p.c);
                         const hb = document.createElement('div'); hb.className='hp-bar';
                         const hf = document.createElement('div'); hf.className='hp-fill';
                         hf.style.width = (p.hp/stats[p.t].hp*100)+'%'; hb.appendChild(hf); cell.appendChild(hb);
@@ -143,84 +132,74 @@
                     el.appendChild(cell);
                 }
             }
-            const sb = document.getElementById('status-bar');
-            sb.innerText = turn === myCol ? "ТВОЙ ХОД" : "ХОД ПРОТИВНИКА";
+            const sb = document.getElementById('status-bar'); sb.innerText = turn === myCol ? "ТВОЙ ХОД" : "ХОД ПРОТИВНИКА";
             sb.style.color = turn === 'white' ? '#fff' : '#ffeb3b';
+            document.getElementById('skip-shoot').style.display = (gamePhase === 'moved' && turn === myCol) ? 'block' : 'none';
         }
 
         async function handleClick(r,c,e) {
             if(turn !== myCol || isProcessing) return;
             const p = board[r][c];
-            if(phase === 'select') {
-                if(p && p.c===turn) {
-                    sel={r,c};
-                    if(e.button === 0) { moves=getMoves(r,c,false); shoots=[]; }
-                    else { shoots=getMoves(r,c,true); moves=[]; }
-                } else { sel=null; moves=[]; shoots=[]; }
-            } else if(phase === 'moved') {
-                const shoot = shoots.find(s=>s.r===r&&s.c===c);
-                if(shoot) {
-                    isProcessing = true;
-                    const dmg = stats[board[sel.r][sel.c].t].d;
-                    const nextT = turn==='white'?'black':'white';
-                    const action = { type:'action', shoot: {fR:sel.r, fC:sel.c, tR:r, tC:c, dmg: dmg}, nextTurn: nextT };
+
+            if(gamePhase === 'select') {
+                if(p && p.c === turn) {
+                    sel = {r,c};
+                    if(e.button === 0) { moves = getMoves(r,c,false); shoots = []; }
+                    else { shoots = getMoves(r,c,true); moves = []; }
+                } else { sel = null; moves = []; shoots = []; }
+            } else if(gamePhase === 'moved') {
+                const s = shoots.find(v=>v.r===r&&v.c===c);
+                if(s) {
+                    isProcessing = true; const dmg = stats[board[sel.r][sel.c].t].d; const nt = turn==='white'?'black':'white';
+                    const action = { type:'action', shoot: {fR:sel.r, fC:sel.c, tR:r, tC:c, dmg: dmg}, nextTurn: nt };
                     await shootFX(sel.r, sel.c, r, c);
-                    if(board[r][c]) { board[r][c].hp -= dmg; if(board[r][c].hp <= 0) { const ik = board[r][c].t === 'k'; board[r][c]=null; if(ik) checkWin(); } }
-                    turn = nextT; sel=null; moves=[]; shoots=[]; phase = 'select'; isProcessing = false;
-                    if(conn) conn.send(action);
-                } else { 
-                    // Pass turn on click away
-                    const nextT = turn==='white'?'black':'white';
-                    if(conn) conn.send({type:'action', nextTurn: nextT});
-                    turn = nextT; sel=null; moves=[]; shoots=[]; phase = 'select';
+                    if(board[r][c]) { board[r][c].hp -= dmg; if(board[r][c].hp <= 0) { const ik = board[r][c].t==='k'; board[r][c]=null; if(ik) checkWin(); } }
+                    finishAction(action);
                 }
             }
 
-            if(phase === 'select' && sel) {
-                const move = moves.find(m=>m.r===r&&m.c===c);
-                const shoot = shoots.find(s=>s.r===r&&s.c===c);
-                if(move) {
-                    isProcessing = true;
-                    const action = { type:'action', move: {fR:sel.r, fC:sel.c, tR:r, tC:c, castle: move.castle}, nextTurn: turn };
-                    if(move.castle) { if(move.castle==='short') { board[r][c-1]=board[r][c+1]; board[r][c+1]=null; } else { board[r][c+1]=board[r][c-2]; board[r][c-2]=null; } }
-                    board[r][c] = {...board[sel.r][sel.c], m:true}; board[sel.r][sel.c]=null;
-                    sel={r,c}; moves=[]; shoots=getMoves(r,c,true);
-                    if(shoots.length === 0) { action.nextTurn = turn==='white'?'black':'white'; turn = action.nextTurn; sel=null; phase = 'select'; }
-                    else { phase = 'moved'; }
-                    isProcessing = false; if(conn) conn.send(action);
-                } else if(shoot && phase === 'select') {
-                    isProcessing = true;
-                    const dmg = stats[board[sel.r][sel.c].t].d;
-                    const nextT = turn==='white'?'black':'white';
-                    const action = { type:'action', shoot: {fR:sel.r, fC:sel.c, tR:r, tC:c, dmg: dmg}, nextTurn: nextT };
+            if(gamePhase === 'select' && sel) {
+                const m = moves.find(v=>v.r===r&&v.c===c);
+                const s = shoots.find(v=>v.r===r&&v.c===c);
+                if(m) {
+                    isProcessing = true; const action = { type:'action', move: {fR:sel.r, fC:sel.c, tR:r, tC:c, castle: m.castle}, nextTurn: turn };
+                    if(m.castle) { if(m.castle==='short'){board[r][c-1]=board[r][c+1]; board[r][c+1]=null;} else {board[r][c+1]=board[r][c-2]; board[r][c-2]=null;} }
+                    board[r][c] = {...board[sel.r][sel.c], m:true}; board[sel.r][sel.c]=null; sel={r,c};
+                    moves = []; shoots = getMoves(r,c,true);
+                    if(shoots.length === 0) { action.nextTurn = turn==='white'?'black':'white'; finishAction(action); }
+                    else { gamePhase = 'moved'; isProcessing = false; if(conn) conn.send(action); }
+                } else if(s && gamePhase === 'select') {
+                    isProcessing = true; const dmg = stats[board[sel.r][sel.c].t].d; const nt = turn==='white'?'black':'white';
+                    const action = { type:'action', shoot: {fR:sel.r, fC:sel.c, tR:r, tC:c, dmg: dmg}, nextTurn: nt };
                     await shootFX(sel.r, sel.c, r, c);
-                    if(board[r][c]) { board[r][c].hp -= dmg; if(board[r][c].hp <= 0) { const ik = board[r][c].t === 'k'; board[r][c]=null; if(ik) checkWin(); } }
-                    turn = nextT; sel=null; moves=[]; shoots=[]; phase = 'select'; isProcessing = false;
-                    if(conn) conn.send(action);
+                    if(board[r][c]) { board[r][c].hp -= dmg; if(board[r][c].hp <= 0) { const ik = board[r][c].t==='k'; board[r][c]=null; if(ik) checkWin(); } }
+                    finishAction(action);
                 }
             }
             render();
         }
 
+        function finishAction(action) { turn = action.nextTurn; sel=null; moves=[]; shoots=[]; gamePhase='select'; isProcessing=false; if(conn) conn.send(action); render(); }
+        function skipShoot() { if(turn !== myCol) return; const nt = turn==='white'?'black':'white'; finishAction({type:'action', nextTurn: nt}); }
+
         function getMoves(r,c,isS) {
-            let res=[]; const p=board[r][c], dir=p.c==='white'?-1:1;
-            if(!p) return [];
+            let res=[]; const p=board[r][c]; if(!p) return []; const dir=p.c==='white'?-1:1;
             if(p.t==='p') {
                 if(!isS) {
-                    if(board[r+dir] && !board[r+dir][c]) { res.push({r:r+dir,c}); if(!p.m && board[r+2*dir] && !board[r+2*dir][c]) res.push({r:r+2*dir,c}); }
-                    [[dir,1],[dir,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(board[nr]&&board[nr][nc]&&board[nr][nc].c!==p.c&&board[nr][nc].t!=='k') res.push({r:nr,c:nc}); });
-                } else [[dir,1],[dir,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(board[nr]&&board[nr][nc]&&board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); });
+                    if(r+dir >= 0 && r+dir < 8 && !board[r+dir][c]) { res.push({r:r+dir,c}); if(!p.m && !board[r+2*dir][c]) res.push({r:r+2*dir,c}); }
+                    [[dir,1],[dir,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c&&board[nr][nc].t!=='k') res.push({r:nr,c:nc}); });
+                } else [[dir,1],[dir,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); });
             } else if(p.t==='n') {
-                [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(board[nr] && board[nr][nc]!==undefined) { if(!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k'))) res.push({r:nr,c:nc}); } });
+                [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8){ if(!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k'))) res.push({r:nr,c:nc}); } });
             } else if(p.t==='k') {
-                for(let dr=-1; dr<=1; dr++){ for(let dc=-1; dc<=1; dc++){ if(dr===0 && dc===0) continue; let nr=r+dr, nc=c+dc; if(board[nr] && board[nr][nc]!==undefined) { if(!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k'))) res.push({r:nr,c:nc}); } } }
+                for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) { if(dr===0&&dc===0)continue; let nr=r+dr, nc=c+dc; if(nr>=0&&nr<8&&nc>=0&&nc<8){ if(!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k'))) res.push({r:nr,c:nc}); } }
                 if(!isS && !p.m) {
                     if(!board[r][c+1] && !board[r][c+2] && board[r][c+3] && board[r][c+3].t==='r' && !board[r][c+3].m) res.push({r:r,c:c+2,castle:'short'});
                     if(!board[r][c-1] && !board[r][c-2] && !board[r][c-3] && board[r][c-4] && board[r][c-4].t==='r' && !board[r][c-4].m) res.push({r:r,c:c-2,castle:'long'});
                 }
             } else {
                 const dirs = p.t==='r' ? [[0,1],[0,-1],[1,0],[-1,0]] : p.t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
-                dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]) { if(!isS) res.push({r:nr,c:nc}); } else { if(board[nr][nc].c!==p.c && (isS||board[nr][nc].t!=='k')) res.push({r:nr,c:nc}); break; } } });
+                dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]){if(!isS)res.push({r:nr,c:nc});} else {if(board[nr][nc].c!==p.c&&(isS||board[nr][nc].t!=='k'))res.push({r:nr,c:nc}); break;} } });
             }
             return res;
         }
@@ -234,17 +213,12 @@
         }
 
         function checkWin() {
-            let whiteK = false, blackK = false;
-            for(let r=0; r<8; r++) for(let c=0; c<8; c++) { if(board[r][c] && board[r][c].t === 'k') { if(board[r][c].c === 'white') whiteK = true; else blackK = true; } }
-            if(!whiteK || !blackK) {
-                document.getElementById('modal').style.display = 'flex';
-                document.getElementById('winner-text').innerText = whiteK ? "БЕЛЫЕ ПОБЕДИЛИ!" : "ЧЕРНЫЕ ПОБЕДИЛИ!";
-            }
+            let wK = false, bK = false;
+            for(let r=0; r<8; r++) for(let c=0; c<8; c++) if(board[r][c] && board[r][c].t === 'k') { if(board[r][c].c === 'white') wK = true; else bK = true; }
+            if(!wK || !bK) { document.getElementById('winner-text').innerText = wK ? "БЕЛЫЕ ВЫИГРАЛИ!" : "ЧЕРНЫЕ ВЫИГРАЛИ!"; document.getElementById('modal').style.display = 'flex'; }
         }
 
-        function requestRematch() { if(conn) { conn.send({type:'REMATCH_REQ'}); document.getElementById('rematch-status').innerText = "Ожидание противника..."; } }
-        function startNewGame() { document.getElementById('modal').style.display = 'none'; document.getElementById('rematch-status').innerText = ""; initBoard(); render(); }
-        function sync() { if(conn && conn.open) conn.send({type:'sync', board, turn}); }
+        function requestRematch() { if(conn) conn.send({type:'REMATCH_REQ'}); document.getElementById('rematch-status').innerText = "ЗАПРОС ОТПРАВЛЕН..."; }
         function copyInvite() { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + document.getElementById('my-id').innerText); alert("ССЫЛКА СКОПИРОВАНА!"); }
         initNetwork();
     </script>

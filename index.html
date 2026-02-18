@@ -3,85 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TURRET CHESS ONLINE v13.0</title>
+    <title>TURRET CHESS ONLINE v13.2</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body {
-            background: #1a1a1a; color: #fff; font-family: 'Arial', sans-serif;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; margin: 0; overflow: hidden;
-        }
-        #lobby {
-            background: rgba(0,0,0,0.9); padding: 20px; border-radius: 15px; text-align: center;
-            border: 2px solid #4caf50; box-shadow: 0 0 30px rgba(76, 175, 80, 0.3);
-        }
+        body { background: #1a1a1a; color: #fff; font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #lobby { background: rgba(0,0,0,0.9); padding: 25px; border-radius: 15px; text-align: center; border: 2px solid #4caf50; width: 300px; }
         #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; }
-        
-        #board {
-            display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px);
-            background: #444; position: relative; border: 5px solid #333;
-        }
-        /* Адаптив для телефонов */
-        @media (max-width: 500px) {
-            #board { grid-template-columns: repeat(8, 11.5vw); grid-template-rows: repeat(8, 11.5vw); }
-            .cell { width: 11.5vw !important; height: 11.5vw !important; font-size: 32px !important; }
-        }
-        .cell {
-            width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
-            font-size: 40px; cursor: pointer; position: relative; transition: all 0.1s; z-index: 1;
-        }
+        #board { display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); background: #444; position: relative; border: 5px solid #333; }
+        @media (max-width: 500px) { #board { grid-template-columns: repeat(8, 11.5vw); grid-template-rows: repeat(8, 11.5vw); } .cell { width: 11.5vw !important; height: 11.5vw !important; font-size: 30px !important; } }
+        .cell { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; position: relative; z-index: 1; }
         .white-cell { background: #eeeed2; color: #333; }
         .black-cell { background: #769656; color: #fff; }
         .piece-white { color: #fff; text-shadow: 2px 2px #000; }
         .piece-black { color: #000; text-shadow: 0px 0px 2px #fff; }
         .selected { background: #f6f669 !important; }
-        .valid-move::after {
-            content: ''; width: 15px; height: 15px; background: rgba(0,0,0,0.2); border-radius: 50%;
-            position: absolute;
-        }
+        .valid-move::after { content: ''; width: 15px; height: 15px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; }
         .valid-shoot { background: #ff5252 !important; box-shadow: inset 0 0 15px rgba(255, 0, 85, 0.4); }
-        .hp-bar {
-            position: absolute; top: 2px; left: 5px; right: 5px; height: 4px;
-            background: #333; border: 1px solid #000; border-radius: 2px; overflow: hidden; pointer-events: none;
-        }
+        .hp-bar { position: absolute; top: 2px; left: 5px; right: 5px; height: 4px; background: #333; border: 1px solid #000; border-radius: 2px; overflow: hidden; pointer-events: none; }
         .hp-fill { height: 100%; background: #00ff00; transition: width 0.3s; }
-        
-        .btn {
-            background: #4caf50; border: none; color: white; padding: 12px 24px;
-            font-weight: bold; cursor: pointer; border-radius: 8px; margin: 10px 0; text-transform: uppercase;
-        }
+        .btn { background: #4caf50; border: none; color: white; padding: 12px 24px; font-weight: bold; cursor: pointer; border-radius: 8px; margin: 10px 0; text-transform: uppercase; }
         .btn.blue { background: #2196f3; }
-        .btn.copy { background: #ff9800; font-size: 10px; padding: 5px 10px; }
-        
+        #status-bar { font-size: 14px; margin-bottom: 10px; font-weight: bold; }
         .fx-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; }
         .bullet { position: absolute; width: 8px; height: 8px; background: yellow; border-radius: 50%; box-shadow: 0 0 10px orange; }
         .explosion { position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, orange, transparent); border-radius: 50%; animation: explode 0.4s ease-out forwards; }
         @keyframes explode { 0% { transform: scale(0.1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
-        
-        #status-bar { font-size: 14px; margin-bottom: 10px; font-weight: bold; }
-        .turn-white { color: #fff; text-shadow: 0 0 5px #fff; }
-        .turn-black { color: #555; text-shadow: 0 0 5px #000; }
     </style>
 </head>
 <body>
 
     <div id="lobby">
-        <h2 style="margin-top:0">TURRET CHESS</h2>
-        <div id="lobby-status">Инициализация сети...</div>
+        <h2 style="margin:0">TURRET CHESS</h2>
+        <div id="lobby-status" style="color: #ffeb3b; font-size: 11px; margin: 10px 0;">Сеть: Инициализация...</div>
+        
         <div id="host-ui" style="display:none">
-            <p style="font-size:12px; color:#aaa">Отправь этот ID другу:</p>
-            <div id="my-id" style="font-weight:bold; font-size:20px; color:#4caf50; margin:10px 0;">----</div>
-            <button class="btn copy" onclick="copyId()">Скопировать ID</button>
-            <p>Или жди подключения...</p>
+            <div id="my-id" onclick="copyId()" style="cursor:pointer; font-weight:bold; font-size:16px; color:#4caf50; background:#222; padding:10px; border-radius:5px; margin:10px 0; word-break: break-all;">----</div>
+            <div style="font-size:10px; color:#666">Кликни на ID, чтобы скопировать</div>
         </div>
-        <div id="join-ui" style="display:none; margin-top:20px;">
-            <input type="text" id="target-id" placeholder="Введи ID друга" style="padding:10px; border-radius:5px; border:none; width:150px">
-            <button class="btn blue" onclick="joinRoom()">Подключиться</button>
+
+        <div id="join-ui" style="display:none; margin-top:15px; border-top: 1px solid #333; padding-top:15px;">
+            <input type="text" id="target-id" placeholder="ID друга" style="padding:10px; border-radius:5px; border:none; width:80%; margin-bottom:10px; text-align:center;">
+            <button class="btn blue" onclick="joinRoom()">ПОДКЛЮЧИТЬСЯ</button>
         </div>
+        <button id="force-start" class="btn" style="display:none; background:#ff9800" onclick="startOnlineGame()">ПНУТЬ СЕТЬ (СТАРТ)</button>
     </div>
 
     <div id="game-ui">
-        <div id="status-bar">Ожидание хода...</div>
+        <div id="status-bar">Ожидание...</div>
         <div id="game-container">
             <div id="board" oncontextmenu="return false;"></div>
             <div id="fx-layer" class="fx-layer"></div>
@@ -91,133 +59,79 @@
 
     <script>
         const boardSize = 8;
-        let board = [];
-        let selectedPiece = null;
-        let validMoves = [];
-        let validShoots = [];
-        let turn = 'white';
-        let gameState = 'select';
-        let myColor = null; 
-        let peer, conn;
-
-        const pieceIcons = {
-            white: { p: '♙', r: '♖', n: '♘', b: '♗', q: '♕', k: '♔' },
-            black: { p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚' }
-        };
-
-        const pieceStats = {
-            p: { hp: 2, damage: 1 }, r: { hp: 7, damage: 3 }, n: { hp: 4, damage: 2 },
-            b: { hp: 4, damage: 2 }, q: { hp: 10, damage: 3 }, k: { hp: 15, damage: 1 }
-        };
-
+        let board = [], selectedPiece = null, validMoves = [], validShoots = [], turn = 'white', gameState = 'select', myColor = null, peer, conn;
+        const pieceIcons = { white: { p: '♙', r: '♖', n: '♘', b: '♗', q: '♕', k: '♔' }, black: { p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚' } };
+        const pieceStats = { p: { hp: 2, damage: 1 }, r: { hp: 7, damage: 3 }, n: { hp: 4, damage: 2 }, b: { hp: 4, damage: 2 }, q: { hp: 10, damage: 3 }, k: { hp: 15, damage: 1 } };
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
         function playSound(freq, type, duration, volume = 0.1) {
-            try {
-                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
-                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + duration);
-                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                osc.connect(gain); gain.connect(audioCtx.destination);
-                osc.start(); osc.stop(audioCtx.currentTime + duration);
-            } catch(e){}
+            try { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + duration); gain.gain.setValueAtTime(volume, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration); } catch(e){}
         }
 
-        // NETWORK
         function initNetwork() {
             peer = new Peer();
-            peer.on('open', (id) => {
-                document.getElementById('lobby-status').innerText = "Готов к игре";
+            peer.on('open', id => {
+                document.getElementById('lobby-status').innerText = "Сеть: ОК. Ждем друга...";
                 document.getElementById('my-id').innerText = id;
                 document.getElementById('host-ui').style.display = 'block';
                 document.getElementById('join-ui').style.display = 'block';
-                
-                // Проверка URL на наличие ID (для входа по ссылке)
-                const urlParams = new URLSearchParams(window.location.search);
-                const joinId = urlParams.get('join');
-                if (joinId) {
-                    document.getElementById('target-id').value = joinId;
-                    joinRoom();
-                }
             });
-
-            peer.on('connection', (c) => {
-                if (conn) return;
-                conn = c;
-                myColor = 'white';
-                setupConn();
-                startOnlineGame();
+            peer.on('connection', c => {
+                conn = c; myColor = 'white'; setupConn();
+                document.getElementById('lobby-status').innerText = "Друг стучится...";
+                document.getElementById('force-start').style.display = 'block';
+                setTimeout(() => { if(conn.open) conn.send({type:'HELLO_BACK'}); }, 500);
             });
+            peer.on('error', err => { document.getElementById('lobby-status').innerText = "Ошибка: " + err.type; });
         }
 
         function joinRoom() {
-            const id = document.getElementById('target-id').value;
+            const id = document.getElementById('target-id').value.trim();
             if (!id) return;
+            document.getElementById('lobby-status').innerText = "Соединение...";
             conn = peer.connect(id);
             myColor = 'black';
-            setupConn();
-            document.getElementById('lobby-status').innerText = "Подключение...";
+            conn.on('open', () => { 
+                setupConn(); 
+                conn.send({type:'HELLO'}); 
+                document.getElementById('lobby-status').innerText = "Рукопожатие...";
+            });
         }
 
         function setupConn() {
-            conn.on('open', () => {
-                startOnlineGame();
-            });
-            conn.on('data', (data) => {
+            conn.on('data', data => {
+                if (data.type === 'HELLO' || data.type === 'HELLO_BACK') startOnlineGame();
                 if (data.type === 'move') {
-                    if (data.shoot) {
-                        shootFX(data.shoot.fromR, data.shoot.fromC, data.shoot.toR, data.shoot.toC).then(() => {
-                            applySync(data);
-                        });
-                    } else {
-                        applySync(data);
-                    }
+                    if (data.shoot) shootFX(data.shoot.fromR, data.shoot.fromC, data.shoot.toR, data.shoot.toC).then(() => applySync(data));
+                    else applySync(data);
                 }
+                if (data.type === 'PING') conn.send({type:'PONG'});
             });
+            setInterval(() => { if(conn && conn.open) conn.send({type:'PING'}); }, 3000);
         }
 
-        function applySync(data) {
-            board = data.board;
-            turn = data.turn;
-            gameState = data.gameState;
-            render();
-        }
+        function applySync(data) { board = data.board; turn = data.turn; gameState = data.gameState; render(); }
 
         function startOnlineGame() {
+            if (document.getElementById('game-ui').style.display === 'flex') return;
             document.getElementById('lobby').style.display = 'none';
             document.getElementById('game-ui').style.display = 'flex';
             initGame();
         }
 
-        function copyId() {
-            const id = document.getElementById('my-id').innerText;
-            navigator.clipboard.writeText(id);
-            alert("ID скопирован!");
-        }
-
-        // GAME LOGIC
         function initGame() {
-            board = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
-            for (let i = 0; i < 8; i++) {
-                board[1][i] = { type: 'p', color: 'black', hp: 2, moved: false };
-                board[6][i] = { type: 'p', color: 'white', hp: 2, moved: false };
-            }
+            board = Array(8).fill().map(() => Array(8).fill(null));
+            for (let i = 0; i < 8; i++) { board[1][i] = { type: 'p', color: 'black', hp: 2, moved: false }; board[6][i] = { type: 'p', color: 'white', hp: 2, moved: false }; }
             const layout = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
-            layout.forEach((p, i) => {
-                board[0][i] = { type: p, color: 'black', hp: pieceStats[p].hp, moved: false };
-                board[7][i] = { type: p, color: 'white', hp: pieceStats[p].hp, moved: false };
-            });
+            layout.forEach((p, i) => { board[0][i] = { type: p, color: 'black', hp: pieceStats[p].hp, moved: false }; board[7][i] = { type: p, color: 'white', hp: pieceStats[p].hp, moved: false }; });
             render();
         }
 
         function render() {
             const boardEl = document.getElementById('board');
             boardEl.innerHTML = '';
-            
-            // Если игрок за черных - переворачиваем доску
             const rows = myColor === 'black' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
             const cols = myColor === 'black' ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
-
             for (let r of rows) {
                 for (let c of cols) {
                     const cell = document.createElement('div');
@@ -226,13 +140,10 @@
                     if (piece) {
                         cell.innerText = pieceIcons[piece.color][piece.type];
                         cell.classList.add(piece.color === 'white' ? 'piece-white' : 'piece-black');
-                        const hpBar = document.createElement('div');
-                        hpBar.className = 'hp-bar';
-                        const hpFill = document.createElement('div');
-                        hpFill.className = 'hp-fill';
+                        const hpBar = document.createElement('div'); hpBar.className = 'hp-bar';
+                        const hpFill = document.createElement('div'); hpFill.className = 'hp-fill';
                         hpFill.style.width = (piece.hp / pieceStats[piece.type].hp * 100) + '%';
-                        hpBar.appendChild(hpFill);
-                        cell.appendChild(hpBar);
+                        hpBar.appendChild(hpFill); cell.appendChild(hpBar);
                     }
                     cell.onmousedown = (e) => handleCellClick(r, c, e);
                     if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) cell.classList.add('selected');
@@ -241,65 +152,23 @@
                     boardEl.appendChild(cell);
                 }
             }
-            
             const statusEl = document.getElementById('status-bar');
-            const isMyTurn = turn === myColor;
-            statusEl.innerText = (isMyTurn ? "ТВОЙ ХОД" : "ХОД ПРОТИВНИКА") + ` (${turn === 'white' ? 'БЕЛЫЕ' : 'ЧЕРНЫЕ'})`;
-            statusEl.className = turn === 'white' ? 'turn-white' : 'turn-black';
+            statusEl.innerText = (turn === myColor ? "ТВОЙ ХОД" : "ЖДИ ВРАГА") + ` (${turn === 'white' ? 'БЕЛЫЕ' : 'ЧЕРНЫЕ'})`;
+            statusEl.style.color = turn === 'white' ? '#fff' : '#888';
         }
 
-        // Вспомогательные функции ходов (упрощенно для экономии места, но по правилам v11)
         function getMoves(r, c, type, color, isShoot = false) {
             let moves = []; const dir = color === 'white' ? -1 : 1;
             if (type === 'p') {
                 if (!isShoot) {
-                    if (board[r+dir] && !board[r+dir][c]) {
-                        moves.push({r: r+dir, c});
-                        if (!board[r][c].moved && board[r+2*dir] && !board[r+2*dir][c]) moves.push({r: r+2*dir, c});
-                    }
-                    [[dir,1],[dir,-1]].forEach(d => {
-                        let nr=r+d[0], nc=c+d[1];
-                        if (board[nr] && board[nr][nc] && board[nr][nc].color !== color && board[nr][nc].type !== 'k') moves.push({r: nr, c: nc});
-                    });
-                } else {
-                    [[dir,1],[dir,-1]].forEach(d => {
-                        let nr=r+d[0], nc=c+d[1];
-                        if (board[nr] && board[nr][nc] && board[nr][nc].color !== color) moves.push({r: nr, c: nc});
-                    });
-                }
-            } else if (type === 'n') {
-                [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(d => {
-                    let nr=r+d[0], nc=c+d[1];
-                    if (board[nr] && board[nr][nc] !== undefined) {
-                        if (!board[nr][nc] || (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k'))) moves.push({r: nr, c: nc});
-                    }
-                });
+                    if (board[r+dir] && !board[r+dir][c]) { moves.push({r: r+dir, c}); if (!board[r][c].moved && board[r+2*dir] && !board[r+2*dir][c]) moves.push({r: r+2*dir, c}); }
+                    [[dir,1],[dir,-1]].forEach(d => { let nr=r+d[0], nc=c+d[1]; if (board[nr] && board[nr][nc] && board[nr][nc].color !== color && board[nr][nc].type !== 'k') moves.push({r: nr, c: nc}); });
+                } else { [[dir,1],[dir,-1]].forEach(d => { let nr=r+d[0], nc=c+d[1]; if (board[nr] && board[nr][nc] && board[nr][nc].color !== color) moves.push({r: nr, c: nc}); }); }
+            } else if (type === 'n') { [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(d => { let nr=r+d[0], nc=c+d[1]; if (board[nr] && board[nr][nc] !== undefined) { if (!board[nr][nc] || (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k'))) moves.push({r: nr, c: nc}); } });
             } else if (type === 'r' || type === 'b' || type === 'q') {
-                const dirs = type === 'r' ? [[0,1],[0,-1],[1,0],[-1,0]] : 
-                             type === 'b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : 
-                             [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
-                dirs.forEach(d => {
-                    for(let i=1; i<8; i++) {
-                        let nr=r+d[0]*i, nc=c+d[1]*i;
-                        if (nr<0 || nr>=8 || nc<0 || nc>=8) break;
-                        if (!board[nr][nc]) { if (!isShoot) moves.push({r: nr, c: nc}); }
-                        else { 
-                            if (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k')) moves.push({r: nr, c: nc});
-                            break; 
-                        }
-                    }
-                });
-            } else if (type === 'k') {
-                for(let dr=-1; dr<=1; dr++) {
-                    for(let dc=-1; dc<=1; dc++) {
-                        if (dr===0 && dc===0) continue;
-                        let nr=r+dr, nc=c+dc;
-                        if (board[nr] && board[nr][nc] !== undefined) {
-                            if (!board[nr][nc] || (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k'))) moves.push({r: nr, c: nc});
-                        }
-                    }
-                }
-            }
+                const dirs = type === 'r' ? [[0,1],[0,-1],[1,0],[-1,0]] : type === 'b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+                dirs.forEach(d => { for(let i=1; i<8; i++) { let nr=r+d[0]*i, nc=c+d[1]*i; if (nr<0 || nr>=8 || nc<0 || nc>=8) break; if (!board[nr][nc]) { if (!isShoot) moves.push({r: nr, c: nc}); } else { if (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k')) moves.push({r: nr, c: nc}); break; } } });
+            } else if (type === 'k') { for(let dr=-1; dr<=1; dr++) { for(let dc=-1; dc<=1; dc++) { if (dr===0 && dc===0) continue; let nr=r+dr, nc=c+dc; if (board[nr] && board[nr][nc] !== undefined) { if (!board[nr][nc] || (board[nr][nc].color !== color && (isShoot || board[nr][nc].type !== 'k'))) moves.push({r: nr, c: nc}); } } } }
             return moves;
         }
 
@@ -308,34 +177,17 @@
             const boardEl = document.getElementById('board');
             const rect = boardEl.getBoundingClientRect();
             const cellW = rect.width / 8;
-            
-            // Расчет координат с учетом переворота доски
-            function getCoords(r, c) {
-                let displayR = myColor === 'black' ? r : 7 - r;
-                let displayC = myColor === 'black' ? 7 - c : c;
-                return { x: displayC * cellW + cellW/2, y: displayR * cellW + cellW/2 };
-            }
-
-            const start = getCoords(fromR, fromC);
-            const end = getCoords(toR, toC);
-
-            const bullet = document.createElement('div'); bullet.className = 'bullet';
-            bullet.style.left = start.x + 'px'; bullet.style.top = start.y + 'px';
+            function getCoords(r, c) { let dispR = myColor === 'black' ? r : 7 - r; let dispC = myColor === 'black' ? 7 - c : c; return { x: dispC * cellW + cellW/2, y: dispR * cellW + cellW/2 }; }
+            const start = getCoords(fromR, fromC), end = getCoords(toR, toC);
+            const bullet = document.createElement('div'); bullet.className = 'bullet'; bullet.style.left = start.x + 'px'; bullet.style.top = start.y + 'px';
             layer.appendChild(bullet); playSound(400, 'sawtooth', 0.1);
-            
             const duration = 300, startTime = performance.now();
             return new Promise(resolve => {
                 function animate(time) {
                     const progress = Math.min((time - startTime) / duration, 1);
-                    bullet.style.left = start.x + (end.x - start.x) * progress + 'px';
-                    bullet.style.top = start.y + (end.y - start.y) * progress + 'px';
+                    bullet.style.left = start.x + (end.x - start.x) * progress + 'px'; bullet.style.top = start.y + (end.y - start.y) * progress + 'px';
                     if (progress < 1) requestAnimationFrame(animate);
-                    else {
-                        bullet.remove(); const explosion = document.createElement('div');
-                        explosion.className = 'explosion'; explosion.style.left = (end.x - 25) + 'px'; explosion.style.top = (end.y - 25) + 'px';
-                        layer.appendChild(explosion); playSound(100, 'square', 0.3, 0.2);
-                        setTimeout(() => { explosion.remove(); resolve(); }, 400);
-                    }
+                    else { bullet.remove(); const exp = document.createElement('div'); exp.className = 'explosion'; exp.style.left = (end.x - 25) + 'px'; exp.style.top = (end.y - 25) + 'px'; layer.appendChild(exp); playSound(100, 'square', 0.3, 0.2); setTimeout(() => { exp.remove(); resolve(); }, 400); }
                 }
                 requestAnimationFrame(animate);
             });
@@ -344,55 +196,46 @@
         async function handleCellClick(r, c, e) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             if (turn !== myColor) return; 
-
             const piece = board[r][c];
             if (gameState === 'select') {
                 if (piece && piece.color === turn) {
                     selectedPiece = { r, c, ...piece };
-                    if (e.button === 0) { 
-                        validMoves = getMoves(r, c, piece.type, piece.color, false); validShoots = [];
-                    } else { 
-                        validShoots = getMoves(r, c, piece.type, piece.color, true); validMoves = [];
-                    }
+                    if (e.button === 0) { validMoves = getMoves(r, c, piece.type, piece.color, false); validShoots = []; }
+                    else { validShoots = getMoves(r, c, piece.type, piece.color, true); validMoves = []; }
                     render();
                 } else if (selectedPiece) {
                     if (validMoves.some(m => m.r === r && m.c === c)) {
-                        if (board[r][c]) { playSound(150, 'triangle', 0.2, 0.3); board[r][c] = null; }
-                        else { playSound(300, 'sine', 0.1, 0.2); }
-                        board[r][c] = { ...board[selectedPiece.r][selectedPiece.c], moved: true };
-                        board[selectedPiece.r][selectedPiece.c] = null;
-                        selectedPiece = { r, c, ...board[r][c] };
-                        gameState = 'shooting_phase';
+                        if (board[r][c]) { playSound(150, 'triangle', 0.2, 0.3); board[r][c] = null; } else playSound(300, 'sine', 0.1, 0.2);
+                        board[r][c] = { ...board[selectedPiece.r][selectedPiece.c], moved: true }; board[selectedPiece.r][selectedPiece.c] = null;
+                        selectedPiece = { r, c, ...board[r][c] }; gameState = 'shooting_phase';
                         validMoves = []; validShoots = getMoves(r, c, selectedPiece.type, selectedPiece.color, true);
-                        if (validShoots.length === 0) endTurn();
-                        else render();
+                        if (validShoots.length === 0) endTurn(); else render();
                     } else if (validShoots.some(m => m.r === r && m.c === c)) {
-                        const target = board[r][c];
-                        const sData = { fromR: selectedPiece.r, fromC: selectedPiece.c, toR: r, toC: c };
+                        const target = board[r][c]; const sData = { fromR: selectedPiece.r, fromC: selectedPiece.c, toR: r, toC: c };
                         await shootFX(sData.fromR, sData.fromC, sData.toR, sData.toC);
-                        target.hp -= pieceStats[selectedPiece.type].damage;
-                        if (target.hp <= 0) board[r][c] = null;
+                        target.hp -= pieceStats[selectedPiece.type].damage; if (target.hp <= 0) board[r][c] = null;
                         endTurn(sData);
                     } else { selectedPiece = null; validMoves = []; validShoots = []; render(); }
                 }
             } else if (gameState === 'shooting_phase') {
                 if (validShoots.some(m => m.r === r && m.c === c)) {
-                    const target = board[r][c];
-                    const sData = { fromR: selectedPiece.r, fromC: selectedPiece.c, toR: r, toC: c };
+                    const target = board[r][c]; const sData = { fromR: selectedPiece.r, fromC: selectedPiece.c, toR: r, toC: c };
                     await shootFX(sData.fromR, sData.fromC, sData.toR, sData.toC);
-                    target.hp -= pieceStats[selectedPiece.type].damage;
-                    if (target.hp <= 0) board[r][c] = null;
+                    target.hp -= pieceStats[selectedPiece.type].damage; if (target.hp <= 0) board[r][c] = null;
                     endTurn(sData);
                 } else endTurn();
             }
         }
 
         function endTurn(shootData = null) {
-            const lastState = { type: 'move', board: board, turn: turn === 'white' ? 'black' : 'white', gameState: 'select', shoot: shootData };
-            turn = lastState.turn; gameState = 'select'; selectedPiece = null; validMoves = []; validShoots = [];
-            if (conn) conn.send(lastState);
+            const nextTurn = turn === 'white' ? 'black' : 'white';
+            const state = { type: 'move', board, turn: nextTurn, gameState: 'select', shoot: shootData };
+            turn = nextTurn; gameState = 'select'; selectedPiece = null; validMoves = []; validShoots = [];
+            if (conn && conn.open) conn.send(state);
             render();
         }
+
+        function copyId() { const id = document.getElementById('my-id').innerText; navigator.clipboard.writeText(id); alert("ID скопирован!"); }
 
         initNetwork();
     </script>

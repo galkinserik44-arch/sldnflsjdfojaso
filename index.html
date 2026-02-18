@@ -3,30 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TURRET CHESS ONLINE v14.0 - FULL SYNC</title>
+    <title>TURRET CHESS ONLINE v15.0 - BUGFIX</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #1a1a1a; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #lobby { background: #000; padding: 25px; border-radius: 15px; text-align: center; border: 2px solid #4caf50; width: 300px; box-shadow: 0 0 50px rgba(0,0,0,1); }
-        #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; }
-        #board { display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); background: #444; position: relative; border: 5px solid #333; }
-        @media (max-width: 500px) { #board { grid-template-columns: repeat(8, 11.5vw); grid-template-rows: repeat(8, 11.5vw); } .cell { width: 11.5vw !important; height: 11.5vw !important; font-size: 28px !important; } }
-        .cell { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; position: relative; z-index: 1; transition: background 0.2s; }
+        #lobby { background: #000; padding: 25px; border-radius: 15px; text-align: center; border: 2px solid #4caf50; width: 300px; }
+        #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; position: relative; }
+        #board-wrapper { position: relative; padding: 10px; background: #333; border-radius: 5px; }
+        #board { display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); background: #444; position: relative; border: 2px solid #000; }
+        @media (max-width: 500px) {
+            #board { grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); }
+            .cell { width: 11vw !important; height: 11vw !important; font-size: 28px !important; }
+        }
+        .cell { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; position: relative; z-index: 5; }
         .white-cell { background: #eeeed2; color: #333; }
         .black-cell { background: #769656; color: #fff; }
         .piece-white { color: #fff; text-shadow: 2px 2px #000; }
         .piece-black { color: #000; text-shadow: 0px 0px 2px #fff; }
         .selected { background: #f6f669 !important; }
-        .valid-move::after { content: ''; width: 12px; height: 12px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; }
+        .valid-move::after { content: ''; width: 12px; height: 12px; background: rgba(0,0,0,0.3); border-radius: 50%; position: absolute; }
         .valid-shoot { background: #ff5252 !important; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
         .hp-bar { position: absolute; top: 1px; left: 3px; right: 3px; height: 4px; background: #333; border: 1px solid #000; border-radius: 2px; overflow: hidden; pointer-events: none; }
         .hp-fill { height: 100%; background: #0f0; transition: width 0.3s; }
-        .btn { background: #4caf50; border: none; color: white; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 8px; width: 100%; text-transform: uppercase; margin-top: 10px; box-shadow: 0 4px #2e7d32; }
-        .btn:active { transform: translateY(2px); box-shadow: 0 2px #2e7d32; }
-        #status-bar { font-size: 18px; margin-bottom: 10px; font-weight: bold; padding: 5px 15px; border-radius: 5px; }
+        .btn { background: #4caf50; border: none; color: white; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 8px; width: 100%; text-transform: uppercase; margin-top: 10px; }
+        #status-bar { font-size: 18px; margin-bottom: 10px; font-weight: bold; text-align: center; width: 100%; }
         .fx-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; }
-        .bullet { position: absolute; width: 10px; height: 10px; background: #ff0; border-radius: 50%; box-shadow: 0 0 15px #f90; }
-        .explosion { position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, #f90, transparent); border-radius: 50%; animation: explode 0.3s ease-out forwards; }
+        .bullet { position: absolute; width: 10px; height: 10px; background: #ff0; border-radius: 50%; box-shadow: 0 0 15px #f90; margin-left: -5px; margin-top: -5px; }
+        .explosion { position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, #f90, transparent); border-radius: 50%; animation: explode 0.3s ease-out forwards; margin-left: -25px; margin-top: -25px; }
         @keyframes explode { 0% { transform: scale(0.1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
     </style>
 </head>
@@ -34,23 +37,23 @@
 
     <div id="lobby">
         <h2 style="margin:0">TURRET CHESS</h2>
-        <div id="lobby-status" style="font-size:12px; margin:10px 0; color:#ffeb3b">СИНХРОНИЗАЦИЯ...</div>
+        <div id="lobby-status" style="font-size:12px; margin:10px 0; color:#ffeb3b">ИНИЦИАЛИЗАЦИЯ...</div>
         <div id="id-box" style="display:none">
             <div id="my-id" style="font-weight:bold; font-size:16px; color:#4caf50; background:#222; padding:10px; margin:10px 0; border-radius:5px; word-break: break-all;">----</div>
-            <button class="btn" style="background:#ff9800" onclick="copyInvite()">КОПИРОВАТЬ ССЫЛКУ</button>
+            <button class="btn" style="background:#ff9800" onclick="copyInvite()">ССЫЛКА ДЛЯ ДРУГА</button>
             <div style="margin: 15px 0; height: 1px; background: #333;"></div>
             <input type="text" id="target-id" placeholder="ID друга" style="padding:10px; width:80%; text-align:center; background:#333; color:#fff; border:none; border-radius:5px; margin-bottom:10px;">
-            <button class="btn" style="background:#2196f3" onclick="joinRoom()">ИГРАТЬ</button>
+            <button class="btn" style="background:#2196f3" onclick="joinRoom()">ПОДКЛЮЧИТЬСЯ</button>
         </div>
     </div>
 
     <div id="game-ui">
         <div id="status-bar">ОЖИДАНИЕ...</div>
-        <div id="game-container">
+        <div id="board-wrapper">
             <div id="board" oncontextmenu="return false;"></div>
             <div id="fx-layer" class="fx-layer"></div>
         </div>
-        <div style="margin-top:10px; font-size:10px; color:#666">ЛКМ: ХОД | ПКМ: ВЫСТРЕЛ</div>
+        <div style="margin-top:10px; font-size:11px; color:#aaa">ЛКМ: ХОД | ПКМ: ВЫСТРЕЛ</div>
     </div>
 
     <script>
@@ -89,16 +92,12 @@
             conn.on('open', () => {
                 document.getElementById('lobby').style.display='none';
                 document.getElementById('game-ui').style.display='flex';
-                initBoard();
-                render();
+                initBoard(); render();
                 if(myCol === 'white') sync();
             });
             conn.on('data', d => {
-                if(d.type === 'action') {
-                    handleRemoteAction(d);
-                } else if(d.type === 'sync') {
-                    board = d.board; turn = d.turn; render();
-                }
+                if(d.type === 'action') handleRemoteAction(d);
+                if(d.type === 'sync') { board = d.board; turn = d.turn; render(); }
             });
         }
 
@@ -114,8 +113,7 @@
                 board[d.shoot.toR][d.shoot.toC].hp -= d.shoot.dmg;
                 if(board[d.shoot.toR][d.shoot.toC].hp <= 0) board[d.shoot.toR][d.shoot.toC] = null;
             }
-            turn = d.nextTurn;
-            render();
+            turn = d.nextTurn; render();
         }
 
         function sync() { if(conn && conn.open) conn.send({type:'sync', board, turn}); }
@@ -129,12 +127,12 @@
 
         function render() {
             const el = document.getElementById('board'); el.innerHTML = '';
-            const isMyTurn = (turn === myCol);
-            const rIdx = myCol==='black' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
-            const cIdx = myCol==='black' ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+            const indices = [0,1,2,3,4,5,6,7];
+            const rows = myCol === 'black' ? indices : [...indices].reverse();
+            const cols = myCol === 'black' ? [...indices].reverse() : indices;
             
-            for(let r of rIdx) {
-                for(let c of cIdx) {
+            for(let r of rows) {
+                for(let c of cols) {
                     const cell = document.createElement('div');
                     cell.className = `cell ${(r+c)%2===0?'white-cell':'black-cell'}`;
                     const p = board[r][c];
@@ -153,9 +151,9 @@
                 }
             }
             const sb = document.getElementById('status-bar');
+            const isMyTurn = (turn === myCol);
             sb.innerText = isMyTurn ? "ТВОЙ ХОД" : "ХОД ПРОТИВНИКА";
-            sb.style.background = turn === 'white' ? '#eee' : '#333';
-            sb.style.color = turn === 'white' ? '#000' : '#fff';
+            sb.style.color = turn === 'white' ? '#fff' : '#aaa';
         }
 
         async function handleClick(r,c,e) {
@@ -172,25 +170,18 @@
                 const shoot = shoots.find(s=>s.r===r&&s.c===c);
                 if(move) {
                     const action = { type:'action', move: {fromR:sel.r, fromC:sel.c, toR:r, toC:c}, nextTurn: turn };
-                    // Local update
                     play(300, 'sine', 0.1);
                     board[r][c] = {...board[sel.r][sel.c], m:1}; board[sel.r][sel.c]=null;
                     sel={r,c}; moves=[]; shoots=getMoves(r,c,true);
-                    if(shoots.length === 0) {
-                        action.nextTurn = turn==='white'?'black':'white';
-                        turn = action.nextTurn; sel=null;
-                    } else {
-                        // Still my turn, but moved. Wait for shoot or skip.
-                    }
+                    if(shoots.length === 0) { action.nextTurn = turn==='white'?'black':'white'; turn = action.nextTurn; sel=null; }
                     if(conn) conn.send(action);
                 } else if(shoot) {
                     const dmg = stats[board[sel.r][sel.c].t].d;
-                    const action = { type:'action', shoot: {fromR:sel.r, fromC:sel.c, toR:r, toC:c, dmg: dmg}, nextTurn: turn==='white'?'black':'white' };
-                    // Local FX
+                    const nextT = turn==='white'?'black':'white';
+                    const action = { type:'action', shoot: {fromR:sel.r, fromC:sel.c, toR:r, toC:c, dmg: dmg}, nextTurn: nextT };
                     await shootFX(sel.r, sel.c, r, c);
-                    board[r][c].hp -= dmg;
-                    if(board[r][c].hp<=0) board[r][c]=null;
-                    turn = action.nextTurn; sel=null; moves=[]; shoots=[];
+                    board[r][c].hp -= dmg; if(board[r][c].hp<=0) board[r][c]=null;
+                    turn = nextT; sel=null; moves=[]; shoots=[];
                     if(conn) conn.send(action);
                 } else { sel=null; moves=[]; shoots=[]; }
             }
@@ -210,6 +201,16 @@
                         if(!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k'))) res.push({r:nr,c:nc});
                     }
                 });
+            } else if(p.t==='k') {
+                for(let dr=-1; dr<=1; dr++){
+                    for(let dc=-1; dc<=1; dc++){
+                        if(dr===0 && dc===0) continue;
+                        let nr=r+dr, nc=c+dc;
+                        if(board[nr] && board[nr][nc]!==undefined) {
+                            if(!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k'))) res.push({r:nr,c:nc});
+                        }
+                    }
+                }
             } else {
                 const dirs = p.t==='r' ? [[0,1],[0,-1],[1,0],[-1,0]] : p.t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
                 dirs.forEach(v=>{
@@ -225,7 +226,8 @@
 
         async function shootFX(fr, fc, tr, tc) {
             const layer = document.getElementById('fx-layer');
-            const rect = document.getElementById('board').getBoundingClientRect();
+            const boardEl = document.getElementById('board');
+            const rect = boardEl.getBoundingClientRect();
             const cw = rect.width / 8;
             function getCoords(r, c) {
                 let dr = myCol === 'black' ? r : 7-r;
@@ -234,8 +236,7 @@
             }
             const s = getCoords(fr, fc), e = getCoords(tr, tc);
             const b = document.createElement('div'); b.className = 'bullet'; b.style.left = s.x+'px'; b.style.top = s.y+'px';
-            layer.appendChild(b);
-            play(400, 'sawtooth', 0.1);
+            layer.appendChild(b); play(400, 'sawtooth', 0.1);
             const start = performance.now();
             return new Promise(res => {
                 function anim(t) {
@@ -244,7 +245,7 @@
                     if (p<1) requestAnimationFrame(anim);
                     else {
                         b.remove(); const ex = document.createElement('div'); ex.className = 'explosion';
-                        ex.style.left = (e.x-25)+'px'; ex.style.top = (e.y-25)+'px';
+                        ex.style.left = e.x+'px'; ex.style.top = e.y+'px';
                         layer.appendChild(ex); play(100, 'square', 0.2, 0.2);
                         setTimeout(() => { ex.remove(); res(); }, 300);
                     }

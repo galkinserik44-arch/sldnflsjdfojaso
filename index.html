@@ -2,153 +2,126 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TURRET CHESS - GRANDMASTER EDITION</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TURRET CHESS - STABLE CROSSPLAY</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { --bg: #161512; --panel: #262421; --accent: #4caf50; --white-cell: #f0d9b5; --black-cell: #b58863; --highlight: rgba(246, 246, 105, 0.8); }
-        body { background: var(--bg); color: #bababa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        
-        #app-container { display: flex; gap: 20px; align-items: flex-start; max-width: 95vw; }
-        @media (max-width: 800px) { #app-container { flex-direction: column; align-items: center; } }
-
-        /* Board Styling */
+        body { background: var(--bg); color: #bababa; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; touch-action: manipulation; }
+        #app-container { display: flex; gap: 15px; align-items: flex-start; max-width: 95vw; }
+        @media (max-width: 850px) { #app-container { flex-direction: column; align-items: center; justify-content: center; gap: 10px; } }
         #board-wrapper { position: relative; border: 4px solid #3d3b38; border-radius: 4px; box-shadow: 0 5px 30px rgba(0,0,0,0.5); }
-        #board { display: grid; grid-template-columns: repeat(8, 65px); grid-template-rows: repeat(8, 65px); background: #333; user-select: none; }
+        #board { display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); background: #333; user-select: none; }
         @media (max-width: 550px) { #board { grid-template-columns: repeat(8, 11.5vw); grid-template-rows: repeat(8, 11.5vw); } }
-        
-        .cell { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 45px; cursor: pointer; position: relative; transition: background 0.1s; }
-        @media (max-width: 550px) { .cell { font-size: 32px; } }
+        .cell { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; position: relative; }
+        @media (max-width: 550px) { .cell { font-size: 30px; } }
         .white-cell { background: var(--white-cell); color: #333; }
         .black-cell { background: var(--black-cell); color: #fff; }
         .piece-white { color: #fff; text-shadow: 2px 2px #000; }
-        .piece-black { color: #000; text-shadow: 0px 0px 2px #fff; }
-        
-        /* Highlights */
+        .piece-black { color: #000; text-shadow: 0px 0px 1px #fff; }
         .selected { background: var(--highlight) !important; }
         .valid-move::after { content: ''; width: 25%; height: 25%; background: rgba(0,0,0,0.15); border-radius: 50%; position: absolute; }
         .valid-shoot { background: rgba(255, 82, 82, 0.6) !important; box-shadow: inset 0 0 15px #000; }
-        .valid-shoot::after { content: '🎯'; font-size: 16px; position: absolute; opacity: 0.8; }
         .valid-castle { background: rgba(66, 165, 245, 0.6) !important; }
-
-        /* HP Bars */
-        .hp-bar { position: absolute; top: 2px; left: 4px; right: 4px; height: 5px; background: rgba(0,0,0,0.5); border-radius: 2px; overflow: hidden; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
+        .hp-bar { position: absolute; top: 1px; left: 3px; right: 3px; height: 4px; background: rgba(0,0,0,0.6); border-radius: 2px; overflow: hidden; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
         .hp-fill { height: 100%; background: #62d62d; transition: width 0.3s; }
-
-        /* Sidebar Styling */
-        #sidebar { width: 260px; background: var(--panel); border-radius: 4px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
-        @media (max-width: 800px) { #sidebar { width: 90vw; } }
-        
-        .status-card { background: #1c1a17; padding: 10px; border-radius: 4px; text-align: center; }
-        .turn-indicator { font-weight: bold; font-size: 20px; text-transform: uppercase; margin-bottom: 5px; }
-        .btn { background: #403d39; border: none; color: #bababa; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
-        .btn:hover { background: #504d48; color: #fff; }
+        #sidebar { width: 240px; background: var(--panel); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+        @media (max-width: 850px) { #sidebar { width: 92vw; padding: 8px; flex-direction: row; align-items: center; justify-content: space-between; } .hide-mobile { display: none; } }
+        .status-card { background: #1c1a17; padding: 8px; border-radius: 4px; text-align: center; flex-grow: 1; }
+        .turn-indicator { font-weight: bold; font-size: 16px; text-transform: uppercase; }
+        .btn { background: #403d39; border: none; color: #bababa; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: all 0.2s; font-size: 12px; }
         .btn-main { background: var(--accent); color: #fff; }
-        .btn-main:hover { background: #66bb6a; }
-        .btn-red { background: #af4c4c; color: #fff; }
-
-        /* FX Layer */
+        .btn-active { background: #ff9800; color: #fff; box-shadow: 0 0 10px rgba(255,152,0,0.5); }
+        #controls-mobile { display: none; gap: 5px; margin-bottom: 5px; width: 100%; }
+        @media (max-width: 850px) { #controls-mobile { display: flex; } }
         .fx-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; }
         .bullet { position: absolute; width: 10px; height: 10px; background: #fff; border-radius: 50%; box-shadow: 0 0 15px #fff; margin-left: -5px; margin-top: -5px; }
         .explosion { position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, #fff, transparent); border-radius: 50%; animation: explode 0.3s forwards; margin-left: -25px; margin-top: -25px; }
         @keyframes explode { 0% { transform: scale(0.1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
-
-        /* Lobby */
         #lobby-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .lobby-box { background: var(--panel); padding: 30px; border-radius: 8px; text-align: center; border: 1px solid #3d3b38; }
-
-        /* Rematch Modal */
+        .lobby-box { background: var(--panel); padding: 25px; border-radius: 8px; text-align: center; border: 1px solid #3d3b38; width: 280px; }
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
-        #modal-box { background: var(--panel); padding: 40px; border-radius: 8px; text-align: center; border: 2px solid var(--accent); }
+        #modal-box { background: var(--panel); padding: 30px; border-radius: 8px; text-align: center; border: 2px solid var(--accent); }
     </style>
 </head>
 <body>
 
     <div id="lobby-overlay">
         <div class="lobby-box">
-            <h1 style="color: #fff; margin-top: 0;">TURRET CHESS</h1>
-            <div id="lobby-status" style="font-size: 14px; margin: 15px 0;">Инициализация сети...</div>
+            <h2 style="color: #fff; margin: 0 0 5px 0;">BOMBO CHESS</h2>
+            <div id="lobby-status" style="font-size: 11px; margin-bottom: 15px; color: #ff9800; background: #1a1a1a; padding: 5px; border-radius: 3px;">Загрузка сети...</div>
             <div id="id-display-box" style="display:none">
-                <div id="my-id" onclick="copyId()" style="background: #1c1a1a; padding: 12px; border-radius: 4px; font-weight: bold; color: var(--accent); cursor: pointer; border: 1px solid #333; margin-bottom: 10px;">----</div>
-                <button class="btn btn-main" onclick="copyInvite()">Копировать ссылку</button>
-                <div style="margin: 20px 0; height: 1px; background: #333;"></div>
-                <input type="text" id="target-id" placeholder="ID противника" style="background: #1c1a1a; border: 1px solid #333; color: #fff; padding: 12px; width: 200px; border-radius: 4px; text-align: center; margin-bottom: 10px;">
-                <button class="btn" style="width: 100%;" onclick="joinRoom()">Присоединиться</button>
+                <div id="my-id" onclick="copyId()" style="background: #1c1a1a; padding: 10px; border-radius: 4px; font-weight: bold; color: var(--accent); cursor: pointer; border: 1px solid #333; margin-bottom: 10px; font-size: 13px; word-break: break-all;">----</div>
+                <button class="btn btn-main" style="width: 100%; margin-bottom:10px;" onclick="copyInvite()">Отправить ссылку</button>
+                <div style="height: 1px; background: #333; margin: 10px 0;"></div>
+                <input type="text" id="target-id" placeholder="ID друга" style="background: #1c1a1a; border: 1px solid #333; color: #fff; padding: 12px; width: 100%; box-sizing: border-box; border-radius: 4px; text-align: center; margin-bottom: 10px;">
+                <button class="btn" style="width: 100%; background: #2196f3; color: #fff;" onclick="joinRoom()">Присоединиться</button>
             </div>
+            <div id="error-box" style="color: #f44336; font-size: 10px; margin-top: 10px;"></div>
         </div>
     </div>
 
     <div id="app-container">
+        <div id="controls-mobile">
+            <button id="mode-move" class="btn btn-active" style="flex:1" onclick="setMobileMode('move')">Ход + Огонь</button>
+            <button id="mode-shoot" class="btn" style="flex:1" onclick="setMobileMode('shoot')">Только огонь</button>
+        </div>
         <div id="board-wrapper">
             <div id="board" oncontextmenu="return false;"></div>
             <div id="fx-layer" class="fx-layer"></div>
         </div>
-
         <div id="sidebar">
-            <div class="status-card">
-                <div id="turn-txt" class="turn-indicator">ОЖИДАНИЕ</div>
-                <div id="my-color-txt" style="font-size: 12px; color: #888;">---</div>
-            </div>
-            
-            <button id="end-turn-btn" class="btn btn-main" style="display:none;" onclick="manualEndTurn()">Завершить ход</button>
-            
-            <div style="flex-grow: 1;"></div>
-            
-            <button class="btn" onclick="location.reload()">Выйти в меню</button>
-            <div style="font-size: 10px; color: #555; text-align: center;">V19.0 GRANDMASTER ONLINE</div>
+            <div class="status-card"><div id="turn-txt" class="turn-indicator">ХОД...</div><div id="my-color-txt" style="font-size: 10px; color: #888;">---</div></div>
+            <button id="end-turn-btn" class="btn btn-main" style="display:none;" onclick="manualEndTurn()">Завершить</button>
+            <button class="btn hide-mobile" onclick="location.reload()">Меню</button>
         </div>
     </div>
 
-    <div id="modal">
-        <div id="modal-box">
-            <h1 id="win-msg" style="color:#fff;">ПОБЕДА!</h1>
-            <button id="rematch-btn" class="btn btn-main" style="width: 200px;" onclick="requestRematch()">Реванш</button>
-            <div id="rematch-status" style="margin-top: 10px; font-size: 12px;"></div>
-        </div>
-    </div>
+    <div id="modal"><div id="modal-box"><h1 id="win-msg" style="color:#fff; margin-top:0;">ПОБЕДА!</h1><button class="btn btn-main" style="width: 100%;" onclick="requestRematch()">Реванш</button></div></div>
 
     <script>
         const CONFIG = { p:{hp:2,d:1}, r:{hp:7,d:3}, n:{hp:4,d:2}, b:{hp:4,d:2}, q:{hp:10,d:3}, k:{hp:15,d:1} };
         const ICONS = { white:{p:'♙',r:'♖',n:'♘',b:'♗',q:'♕',k:'♔'}, black:{p:'♟',r:'♜',n:'♞',b:'♝',q:'♛',k:'♚'} };
-        let board=[], sel=null, moves=[], shoots=[], turn='white', myCol=null, peer, conn, isBusy=false, hasMoved=false;
+        let board=[], sel=null, moves=[], shoots=[], turn='white', myCol=null, peer, conn, isBusy=false, hasMoved=false, mobileMode='move';
         const audio = new (window.AudioContext || window.webkitAudioContext)();
 
-        function play(f,t,d){ try{const o=audio.createOscillator(),g=audio.createGain();o.type=t;o.frequency.setValueAtTime(f,audio.currentTime);g.gain.setValueAtTime(0.1,audio.currentTime);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d);}catch(e){} }
+        function play(f,t,d){ try{const o=audio.createOscillator(),g=audio.createGain();o.type=t;o.frequency.setValueAtTime(f,audio.currentTime);g.gain.setValueAtTime(0.05,audio.currentTime);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d);}catch(e){} }
 
         function initNetwork() {
-            peer = new Peer({config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}});
+            peer = new Peer({ config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun2.l.google.com:19302' }, { urls: 'stun:stun.services.mozilla.com' }] } });
             peer.on('open', id => {
-                document.getElementById('lobby-status').innerText = "Готов к игре";
+                document.getElementById('lobby-status').innerText = "Сеть готова. Ожидание...";
                 document.getElementById('my-id').innerText = id;
                 document.getElementById('id-display-box').style.display = 'block';
                 const joinId = new URLSearchParams(window.location.search).get('join');
-                if(joinId) { document.getElementById('target-id').value = joinId; joinRoom(); }
+                if(joinId) { document.getElementById('target-id').value = joinId; setTimeout(joinRoom, 1000); }
+                // Keep-alive heartbeat
+                setInterval(() => { if(peer && !peer.destroyed) peer.socket.send({type: 'HEARTBEAT'}); }, 20000);
             });
-            peer.on('connection', c => {
-                if(conn) return;
-                conn = c; myCol = 'white'; setupConn();
+            peer.on('connection', c => { if(conn) return; conn = c; myCol = 'white'; setupConn(); });
+            peer.on('error', e => { 
+                document.getElementById('error-box').innerText = "Ошибка: " + e.type;
+                if(e.type === 'peer-unavailable') document.getElementById('error-box').innerText = "Друг не найден. Проверь ID или пусть он обновит страницу.";
             });
-            peer.on('error', e => alert("Ошибка сети: " + e.type));
         }
 
         function joinRoom() {
-            const id = document.getElementById('target-id').value.trim();
+            const id = document.getElementById('target-id').value.trim().replace(/\s/g, '');
             if(!id) return;
+            document.getElementById('lobby-status').innerText = "Подключение к " + id.substring(0,6) + "...";
             myCol = 'black';
-            conn = peer.connect(id);
+            conn = peer.connect(id, { reliable: true });
             setupConn();
         }
 
         function setupConn() {
-            conn.on('open', () => {
-                document.getElementById('lobby-overlay').style.display = 'none';
-                startNewGame();
-            });
+            conn.on('open', () => { document.getElementById('lobby-overlay').style.display = 'none'; startNewGame(); });
             conn.on('data', d => {
                 if(d.type === 'action') applyRemoteAction(d);
                 if(d.type === 'rematch_req') { if(confirm("Противник хочет реванш!")) { conn.send({type:'rematch_ok'}); startNewGame(); } }
                 if(d.type === 'rematch_ok') startNewGame();
             });
+            conn.on('close', () => { alert("Связь потеряна"); location.reload(); });
         }
 
         async function applyRemoteAction(d) {
@@ -157,8 +130,7 @@
                 const p = board[d.move.fR][d.move.fC];
                 if(d.move.castle === 'short') { board[d.move.tR][d.move.tC-1] = board[d.move.tR][d.move.tC+1]; board[d.move.tR][d.move.tC+1] = null; }
                 if(d.move.castle === 'long') { board[d.move.tR][d.move.tC+1] = board[d.move.tR][d.move.tC-2]; board[d.move.tR][d.move.tC-2] = null; }
-                board[d.move.tR][d.move.tC] = p; board[d.move.fR][d.move.fC] = null;
-                p.m = true; play(300, 'sine', 0.1);
+                board[d.move.tR][d.move.tC] = p; board[d.move.fR][d.move.fC] = null; p.m = true; play(300, 'sine', 0.1);
             }
             if(d.shoot) {
                 await shootFX(d.shoot.fR, d.shoot.fC, d.shoot.tR, d.shoot.tC);
@@ -170,40 +142,25 @@
 
         function startNewGame() {
             board = Array(8).fill().map(() => Array(8).fill(null));
-            for(let i=0; i<8; i++) {
-                board[1][i] = {t:'p', c:'black', hp:2, m:false};
-                board[6][i] = {t:'p', c:'white', hp:2, m:false};
-            }
+            for(let i=0; i<8; i++) { board[1][i] = {t:'p', c:'black', hp:2, m:false}; board[6][i] = {t:'p', c:'white', hp:2, m:false}; }
             const l = ['r','n','b','q','k','b','n','r'];
-            l.forEach((p, i) => {
-                board[0][i] = {t:p, c:'black', hp:CONFIG[p].hp, m:false};
-                board[7][i] = {t:p, c:'white', hp:CONFIG[p].hp, m:false};
-            });
-            turn = 'white'; myColText(); hasMoved = false; sel = null; isBusy = false;
+            l.forEach((p, i) => { board[0][i] = {t:p, c:'black', hp:CONFIG[p].hp, m:false}; board[7][i] = {t:p, c:'white', hp:CONFIG[p].hp, m:false}; });
+            turn = 'white'; hasMoved = false; sel = null; isBusy = false;
+            document.getElementById('my-color-txt').innerText = "ВЫ: " + (myCol === 'white' ? "БЕЛЫЕ" : "ЧЕРНЫЕ");
             document.getElementById('modal').style.display = 'none'; render();
-        }
-
-        function myColText() {
-            const el = document.getElementById('my-color-txt');
-            el.innerText = "ВЫ ИГРАЕТЕ ЗА " + (myCol === 'white' ? "БЕЛЫХ" : "ЧЕРНЫХ");
-            el.style.color = myCol === 'white' ? '#fff' : '#888';
         }
 
         function render() {
             const el = document.getElementById('board'); el.innerHTML = '';
-            // Rotate board for black
-            const indices = [0,1,2,3,4,5,6,7];
-            const rows = myCol === 'black' ? indices : [...indices].reverse();
-            const cols = myCol === 'black' ? [...indices].reverse() : indices;
-
+            const idxs = [0,1,2,3,4,5,6,7];
+            const rows = myCol === 'black' ? idxs : [...idxs].reverse();
+            const cols = myCol === 'black' ? [...idxs].reverse() : idxs;
             for(let r of rows) {
                 for(let c of cols) {
-                    const cell = document.createElement('div');
-                    cell.className = `cell ${(r+c)%2===0 ? 'white-cell' : 'black-cell'}`;
+                    const cell = document.createElement('div'); cell.className = `cell ${(r+c)%2===0 ? 'white-cell' : 'black-cell'}`;
                     const p = board[r][c];
                     if(p) {
-                        cell.innerText = ICONS[p.c][p.t];
-                        cell.classList.add('piece-'+p.c);
+                        cell.innerText = ICONS[p.c][p.t]; cell.classList.add('piece-'+p.c);
                         const hb = document.createElement('div'); hb.className='hp-bar';
                         const hf = document.createElement('div'); hf.className='hp-fill';
                         hf.style.width = (p.hp/CONFIG[p.t].hp*100)+'%'; hb.appendChild(hf); cell.appendChild(hb);
@@ -216,46 +173,37 @@
                 }
             }
             const st = document.getElementById('turn-txt');
-            st.innerText = turn === myCol ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА";
-            st.style.color = turn === 'white' ? '#fff' : '#888';
+            st.innerText = turn === myCol ? "ВАШ ХОД" : "ЖДИТЕ";
+            st.style.color = turn === 'white' ? '#fff' : '#f0d9b5';
             document.getElementById('end-turn-btn').style.display = (hasMoved && turn === myCol) ? 'block' : 'none';
         }
 
+        function setMobileMode(m) { mobileMode = m; document.getElementById('mode-move').classList.toggle('btn-active', m === 'move'); document.getElementById('mode-shoot').classList.toggle('btn-active', m === 'shoot'); if(sel){ if(m==='move'){moves=getMoves(sel.r,sel.c,false);shoots=[];} else{shoots=getMoves(sel.r,sel.c,true);moves=[];} render();} }
+
         async function handleClick(r, c, e) {
             if(turn !== myCol || isBusy) return;
+            const isShoot = (e.button === 2) || (e.pointerType === 'touch' && mobileMode === 'shoot') || (mobileMode === 'shoot');
             const p = board[r][c];
-
             if(!hasMoved) {
-                if(p && p.c === turn) {
-                    sel = {r, c};
-                    if(e.button === 0) { moves = getMoves(r, c, false); shoots = []; }
-                    else { shoots = getMoves(r, c, true); moves = []; }
-                } else if(sel) {
-                    const m = moves.find(v=>v.r===r && v.c===c);
-                    const s = shoots.find(v=>v.r===r && v.c===c);
+                if(p && p.c === turn) { sel = {r, c}; if(isShoot) { shoots = getMoves(r, c, true); moves = []; } else { moves = getMoves(r, c, false); shoots = []; } }
+                else if(sel) {
+                    const m = moves.find(v=>v.r===r && v.c===c), s = shoots.find(v=>v.r===r && v.c===c);
                     if(m) {
-                        isBusy = true;
-                        const act = { type:'action', move:{fR:sel.r, fC:sel.c, tR:r, tC:c, castle:m.castle}, next:turn };
-                        if(m.castle) {
-                            if(m.castle === 'short') { board[r][c-1] = board[r][c+1]; board[r][c+1] = null; }
-                            else { board[r][c+1] = board[r][c-2]; board[r][c-2] = null; }
-                        }
-                        board[r][c] = {...board[sel.r][sel.c], m:true}; board[sel.r][sel.c] = null; sel = {r, c};
-                        play(300, 'sine', 0.1); hasMoved = true; moves = []; shoots = getMoves(r, c, true);
+                        isBusy = true; const act = { type:'action', move:{fR:sel.r, fC:sel.c, tR:r, tC:c, castle:m.castle}, next:turn };
+                        if(m.castle) { if(m.castle === 'short') { board[r][c-1] = board[r][c+1]; board[r][c+1] = null; } else { board[r][c+1] = board[r][c-2]; board[r][c-2] = null; } }
+                        board[r][c] = {...board[sel.r][sel.c], m:true}; board[sel.r][sel.c] = null; sel = {r, c}; play(300, 'sine', 0.1); hasMoved = true; moves = []; shoots = getMoves(r, c, true);
                         if(shoots.length === 0) finalize(act); else { isBusy = false; if(conn) conn.send(act); }
                     } else if(s) {
-                        isBusy = true;
-                        const act = { type:'action', shoot:{fR:sel.r, fC:sel.c, tR:r, tC:c, d:CONFIG[board[sel.r][sel.c].t].d}, next:turn==='white'?'black':'white' };
+                        isBusy = true; const act = { type:'action', shoot:{fR:sel.r, fC:sel.c, tR:r, tC:c, d:CONFIG[board[sel.r][sel.c].t].d}, next:turn==='white'?'black':'white' };
                         await shootFX(sel.r, sel.c, r, c);
                         board[r][c].hp -= act.shoot.d; if(board[r][c].hp <= 0) { const ik = board[r][c].t === 'k'; board[r][c] = null; if(ik) checkWin(); }
                         finalize(act);
                     } else { sel = null; moves = []; shoots = []; }
                 }
-            } else { // After move
+            } else {
                 const s = shoots.find(v=>v.r===r && v.c===c);
                 if(s) {
-                    isBusy = true;
-                    const act = { type:'action', shoot:{fR:sel.r, fC:sel.c, tR:r, tC:c, d:CONFIG[board[sel.r][sel.c].t].d}, next:turn==='white'?'black':'white' };
+                    isBusy = true; const act = { type:'action', shoot:{fR:sel.r, fC:sel.c, tR:r, tC:c, d:CONFIG[board[sel.r][sel.c].t].d}, next:turn==='white'?'black':'white' };
                     await shootFX(sel.r, sel.c, r, c);
                     if(board[r][c]) { board[r][c].hp -= act.shoot.d; if(board[r][c].hp <= 0) { const ik = board[r][c].t === 'k'; board[r][c] = null; if(ik) checkWin(); } }
                     finalize(act);
@@ -264,33 +212,19 @@
             render();
         }
 
-        function finalize(act) {
-            turn = turn==='white' ? 'black' : 'white'; act.next = turn;
-            sel = null; moves = []; shoots = []; hasMoved = false; isBusy = false;
-            if(conn) conn.send(act); render();
-        }
-
+        function finalize(act) { turn = turn==='white' ? 'black' : 'white'; act.next = turn; sel = null; moves = []; shoots = []; hasMoved = false; isBusy = false; if(conn) conn.send(act); render(); }
         function manualEndTurn() { if(turn === myCol) finalize({type:'action'}); }
 
         function getMoves(r,c,isS) {
             let res=[]; const p=board[r][c]; if(!p) return []; const dr=p.c==='white'?-1:1;
             if(p.t==='p') {
-                if(!isS) {
-                    if(r+dr>=0 && r+dr<8 && !board[r+dr][c]) { res.push({r:r+dr,c}); if(!p.m && !board[r+2*dr][c]) res.push({r:r+2*dr,c}); }
-                    [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c&&board[nr][nc].t!=='k') res.push({r:nr,c:nc}); });
-                } else [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); });
-            } else if(p.t==='n') {
-                [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k')))) res.push({r:nr,c:nc}); });
+                if(!isS) { if(r+dr>=0 && r+dr<8 && !board[r+dr][c]) { res.push({r:r+dr,c}); if(!p.m && !board[r+2*dr][c]) res.push({r:r+2*dr,c}); } [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c&&board[nr][nc].t!=='k') res.push({r:nr,c:nc}); }); }
+                else [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); });
+            } else if(p.t==='n') { [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k')))) res.push({r:nr,c:nc}); });
             } else if(p.t==='k') {
                 for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) { if(i===0&&j===0)continue; let nr=r+i, nc=c+j; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k')))) res.push({r:nr,c:nc}); }
-                if(!isS && !p.m) {
-                    if(!board[r][c+1] && !board[r][c+2] && board[r][c+3]?.t==='r' && !board[r][c+3].m) res.push({r:r,c:c+2,castle:'short'});
-                    if(!board[r][c-1] && !board[r][c-2] && !board[r][c-3] && board[r][c-4]?.t==='r' && !board[r][c-4].m) res.push({r:r,c:c-2,castle:'long'});
-                }
-            } else {
-                const dirs = p.t==='r' ? [[0,1],[0,-1],[1,0],[-1,0]] : p.t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
-                dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]){if(!isS)res.push({r:nr,c:nc});} else {if(board[nr][nc].c!==p.c&&(isS||board[nr][nc].t!=='k'))res.push({r:nr,c:nc}); break;} } });
-            }
+                if(!isS && !p.m) { if(!board[r][c+1] && !board[r][c+2] && board[r][c+3]?.t==='r' && !board[r][c+3].m) res.push({r:r,c:c+2,castle:'short'}); if(!board[r][c-1] && !board[r][c-2] && !board[r][c-3] && board[r][c-4]?.t==='r' && !board[r][c-4].m) res.push({r:r,c:c-2,castle:'long'}); }
+            } else { const dirs = p.t==='r' ? [[0,1],[0,-1],[1,0],[-1,0]] : p.t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]; dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]){if(!isS)res.push({r:nr,c:nc});} else {if(board[nr][nc].c!==p.c&&(isS||board[nr][nc].t!=='k'))res.push({r:nr,c:nc}); break;} } }); }
             return res;
         }
 
@@ -302,18 +236,9 @@
             return new Promise(res => { const start=performance.now(); function anim(t){ const p=Math.min((t-start)/300,1); b.style.left=s.x+(e.x-s.x)*p+'px'; b.style.top=s.y+(e.y-s.y)*p+'px'; if(p<1)requestAnimationFrame(anim); else { b.remove(); const ex=document.createElement('div'); ex.className='explosion'; ex.style.left=e.x+'px'; ex.style.top=e.y+'px'; layer.appendChild(ex); play(100,'square',0.2); setTimeout(()=>{ex.remove(); res();},300); } } requestAnimationFrame(anim); });
         }
 
-        function checkWin() {
-            let wK=false, bK=false;
-            for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(board[r][c]?.t==='k') { if(board[r][c].c==='white') wK=true; else bK=true; }
-            if(!wK || !bK) endGame(wK?'black':'white');
-        }
-
-        function endGame(lostColor) {
-            document.getElementById('win-msg').innerText = lostColor==='white' ? "ЧЕРНЫЕ ПОБЕДИЛИ!" : "БЕЛЫЕ ПОБЕДИЛИ!";
-            document.getElementById('modal').style.display='flex';
-        }
-
-        function requestRematch() { if(conn) { conn.send({type:'rematch_req'}); document.getElementById('rematch-status').innerText = "Запрос отправлен..."; } }
+        function checkWin() { let wK=false, bK=false; for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(board[r][c]?.t==='k') { if(board[r][c].c==='white') wK=true; else bK=true; } if(!wK || !bK) endGame(wK?'black':'white'); }
+        function endGame(lostColor) { document.getElementById('win-msg').innerText = lostColor==='white' ? "ЧЕРНЫЕ ПОБЕДИЛИ!" : "БЕЛЫЕ ПОБЕДИЛИ!"; document.getElementById('modal').style.display='flex'; }
+        function requestRematch() { if(conn) { conn.send({type:'rematch_req'}); alert("Запрос отправлен!"); } }
         function copyInvite() { navigator.clipboard.writeText(window.location.origin+window.location.pathname+"?join="+document.getElementById('my-id').innerText); alert("Ссылка скопирована!"); }
         function copyId() { navigator.clipboard.writeText(document.getElementById('my-id').innerText); alert("ID скопирован!"); }
 

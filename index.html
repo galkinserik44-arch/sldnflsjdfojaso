@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TURRET CHESS - TANK EDITION v24</title>
+    <title>TURRET CHESS - PRO v25 Persistence</title>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script async src="https://telegram.org/js/telegram-widget.js?22"></script>
     <style>
         :root {
             --bg: #161512;
@@ -59,10 +60,10 @@
         .btn-main { background: var(--accent); color: #fff; }
 
         #lobby-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .lobby-box { background: var(--panel); padding: 30px; border-radius: 8px; text-align: center; border: 1px solid #3d3b38; width: 300px; }
+        .lobby-box { background: var(--panel); padding: 30px; border-radius: 8px; text-align: center; border: 1px solid #3d3b38; width: 320px; }
 
-        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
-        #modal-box { background: var(--panel); padding: 40px; border-radius: 8px; text-align: center; border: 2px solid var(--accent); }
+        .user-profile { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: #1a1a1a; padding: 10px; border-radius: 6px; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: #333; }
 
         .fx-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; }
         .bullet { position: absolute; width: 12px; height: 12px; background: #ff9800; border-radius: 50%; box-shadow: 0 0 15px #ff5722; margin-left: -6px; margin-top: -6px; }
@@ -74,8 +75,21 @@
 
 <div id="lobby-overlay">
     <div class="lobby-box">
-        <h1 style="color: #fff; margin-top: 0;">BOMBO CHESS</h1>
+        <h1 style="color: #fff; margin-top: 0; letter-spacing: 2px;">BOMBO CHESS</h1>
+        
+        <div id="tg-login-container" style="margin-bottom: 20px;">
+            <div id="user-info" class="user-profile" style="display:none">
+                <img id="u-ava" class="user-avatar" src="">
+                <div id="u-name" style="font-weight: bold; color: #fff;"></div>
+            </div>
+            <!-- Plug for Telegram Login -->
+            <div id="tg-button">
+                <button class="btn" style="background: #54a9eb; color: #fff; width: 100%;" onclick="mockLogin()">Войти через Telegram</button>
+            </div>
+        </div>
+
         <div id="lobby-status" style="font-size: 13px; margin: 15px 0; color: #ff9800;">Проверка сервера...</div>
+        
         <div id="id-display-box" style="display:none">
             <div id="my-id" onclick="copyId()" style="background: #1c1a1a; padding: 12px; border-radius: 4px; font-weight: bold; color: var(--accent); cursor: pointer; border: 1px solid #333; margin-bottom: 10px; font-size: 13px; word-break: break-all;">----</div>
             <button class="btn btn-main" style="width: 100%;" onclick="copyInvite()">Копировать ссылку</button>
@@ -83,6 +97,7 @@
             <input type="text" id="target-id" placeholder="ID противника" style="background: #1c1a1a; border: 1px solid #333; color: #fff; padding: 12px; width: 100%; box-sizing: border-box; border-radius: 4px; text-align: center; margin-bottom: 10px;">
             <button class="btn" style="width: 100%; background: #2196f3; color: #fff;" onclick="joinRoom()">Присоединиться</button>
         </div>
+        <button id="resume-btn" class="btn" style="display:none; width: 100%; margin-top: 10px; background: #9c27b0; color: #fff;" onclick="resumeGame()">Вернуться в игру</button>
     </div>
 </div>
 
@@ -96,12 +111,17 @@
             <div id="turn-txt" class="turn-indicator">ХОД...</div>
             <div id="my-color-txt" style="font-size: 12px; color: #888;">---</div>
         </div>
-        <button id="end-turn-btn" class="btn btn-main" style="display:none;" onclick="manualEndTurn()">Завершить ход</button>
-        <button class="btn hide-mobile" onclick="location.reload()">Меню</button>
+        <button id="end-turn-btn" class="btn btn-main" style="display:none;" onclick="manualEndTurn()">Завершить</button>
+        <button class="btn hide-mobile" onclick="clearAndReload()">Новая игра</button>
     </div>
 </div>
 
-<div id="modal"><div id="modal-box"><h1 id="win-msg" style="color:#fff;">ПОБЕДА!</h1><button class="btn btn-main" style="width: 200px;" onclick="location.reload()">В лобби</button></div></div>
+<div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; flex-direction:column; align-items:center; justify-content:center;">
+    <div style="background: var(--panel); padding: 40px; border-radius: 8px; text-align: center; border: 2px solid var(--accent);">
+        <h1 id="win-msg" style="color:#fff;">ПОБЕДА!</h1>
+        <button class="btn btn-main" style="width: 200px;" onclick="clearAndReload()">В лобби</button>
+    </div>
+</div>
 
 <script>
     const MY_SERVER_HOST = 'chess-bv8u.onrender.com';
@@ -113,53 +133,60 @@
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // --- SOUND ENGINE ---
+    // --- UTILS ---
+    function saveState() {
+        if (!board.length) return;
+        localStorage.setItem('chess_state', JSON.stringify({ board, turn, myCol, hasMoved }));
+    }
+    function loadState() {
+        const raw = localStorage.getItem('chess_state');
+        return raw ? JSON.parse(raw) : null;
+    }
+    function clearAndReload() { localStorage.removeItem('chess_state'); location.reload(); }
+
+    function mockLogin() {
+        document.getElementById('tg-button').style.display = 'none';
+        document.getElementById('user-info').style.display = 'flex';
+        document.getElementById('u-name').innerText = "Nazar⚡";
+        document.getElementById('u-ava').src = "https://github.com/apple-touch-icon.png";
+    }
+
+    // --- SOUNDS ---
     function playTankShot() {
         const o = audioCtx.createOscillator(), g = audioCtx.createGain();
         o.type = 'sawtooth'; o.frequency.setValueAtTime(150, audioCtx.currentTime);
         o.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
-        g.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
-        o.connect(g); g.connect(audioCtx.destination);
-        o.start(); o.stop(audioCtx.currentTime + 0.3);
-        // Low thump
-        const o2 = audioCtx.createOscillator(), g2 = audioCtx.createGain();
-        o2.type = 'sine'; o2.frequency.setValueAtTime(60, audioCtx.currentTime);
-        g2.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        g2.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
-        o2.connect(g2); g2.connect(audioCtx.destination);
-        o2.start(); o2.stop(audioCtx.currentTime + 0.5);
+        g.gain.setValueAtTime(0.2, audioCtx.currentTime); g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+        o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.4);
     }
-
     function playExplosion() {
-        const bufferSize = audioCtx.sampleRate * 0.5, buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate), data = buffer.getChannelData(0);
+        const bufferSize = audioCtx.sampleRate * 0.4, buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate), data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-        const noise = audioCtx.createBufferSource(), g = audioCtx.createGain(), f = audioCtx.createBiquadFilter();
-        noise.buffer = buffer; f.type = 'lowpass'; f.frequency.setValueAtTime(400, audioCtx.currentTime);
-        g.gain.setValueAtTime(0.6, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        noise.connect(f); f.connect(g); g.connect(audioCtx.destination);
-        noise.start();
+        const noise = audioCtx.createBufferSource(), g = audioCtx.createGain();
+        noise.buffer = buffer; g.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        noise.connect(g); g.connect(audioCtx.destination); noise.start();
     }
-
     function playFart() {
         const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-        o.type = 'sawtooth'; o.frequency.setValueAtTime(100, audioCtx.currentTime);
-        o.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.4);
-        // Modulator for "bubbly" effect
-        const mod = audioCtx.createOscillator(); mod.type = 'sine'; mod.frequency.value = 20;
-        const modGain = audioCtx.createGain(); modGain.gain.value = 30;
-        mod.connect(modGain); modGain.connect(o.frequency);
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(80, audioCtx.currentTime);
+        o.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+        const mod = audioCtx.createOscillator(); mod.frequency.value = 25;
+        const modG = audioCtx.createGain(); modG.gain.value = 20;
+        mod.connect(modG); modG.connect(o.frequency);
         g.gain.setValueAtTime(0.3, audioCtx.currentTime); g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
-        mod.start(); o.start(); mod.stop(audioCtx.currentTime + 0.5); o.stop(audioCtx.currentTime + 0.5);
-        o.connect(g); g.connect(audioCtx.destination);
+        mod.start(); o.start(); o.connect(g); g.connect(audioCtx.destination);
+        o.stop(audioCtx.currentTime+0.5); mod.stop(audioCtx.currentTime+0.5);
     }
 
+    // --- NETWORK ---
     function initNetwork() {
         peer = new Peer({ host: MY_SERVER_HOST, port: 443, path: '/', secure: true });
         peer.on('open', id => {
-            document.getElementById('lobby-status').innerText = "Готов к игре";
+            document.getElementById('lobby-status').innerText = "Сервер готов";
             document.getElementById('my-id').innerText = id;
             document.getElementById('id-display-box').style.display = 'block';
+            if (loadState()) document.getElementById('resume-btn').style.display = 'block';
         });
         peer.on('connection', c => { if(conn) return; conn = c; myCol = 'white'; setupConn(); });
     }
@@ -172,12 +199,11 @@
     }
 
     function setupConn() {
-        conn.on('open', () => { document.getElementById('lobby-overlay').style.display = 'none'; startNewGame(); });
-        conn.on('data', d => {
-            if(d.type === 'action') applyRemoteAction(d);
-            if(d.type === 'rematch_req') { if(confirm("Противник хочет реванш!")) { conn.send({type:'rematch_ok'}); startNewGame(); } }
-            if(d.type === 'rematch_ok') startNewGame();
+        conn.on('open', () => {
+            document.getElementById('lobby-overlay').style.display = 'none';
+            if (!loadState()) startNewGame(); else resumeGame();
         });
+        conn.on('data', d => { if(d.type === 'action') applyRemoteAction(d); });
     }
 
     async function applyRemoteAction(d) {
@@ -193,14 +219,10 @@
             const target = board[d.shoot.tR][d.shoot.tC];
             if(target) {
                 target.hp -= d.shoot.d;
-                if(target.hp <= 0) {
-                    playFart();
-                    const isK = target.t === 'k'; board[d.shoot.tR][d.shoot.tC] = null;
-                    if(isK) endGame(target.c);
-                }
+                if(target.hp <= 0) { playFart(); if(target.t === 'k') endGame(target.c); board[d.shoot.tR][d.shoot.tC] = null; }
             }
         }
-        turn = d.next; isBusy = false; render();
+        turn = d.next; isBusy = false; saveState(); render();
     }
 
     function startNewGame() {
@@ -209,15 +231,23 @@
         for(let i=0; i<8; i++) { board[1][i] = sp(1, i, 'p', 'black'); board[6][i] = sp(6, i, 'p', 'white'); }
         ['r','n','b','q','k','b','n','r'].forEach((p, i) => { board[0][i] = sp(0, i, p, 'black'); board[7][i] = sp(7, i, p, 'white'); });
         turn = 'white'; hasMoved = false; sel = null; isBusy = false;
-        document.getElementById('modal').style.display = 'none';
+        saveState(); render();
+    }
+
+    function resumeGame() {
+        const s = loadState(); if(!s) return;
+        board = s.board; turn = s.turn; myCol = s.myCol; hasMoved = s.hasMoved;
+        document.getElementById('lobby-overlay').style.display = 'none';
         render();
     }
 
     function render() {
         const el = document.getElementById('board'); el.innerHTML = '';
         const idxs = [0,1,2,3,4,5,6,7];
+        // Board Flip Logic: Bottom is always player's color
         const rows = myCol === 'black' ? idxs : [...idxs].reverse();
         const cols = myCol === 'black' ? [...idxs].reverse() : idxs;
+
         for(let r of rows) {
             for(let c of cols) {
                 const cell = document.createElement('div');
@@ -237,6 +267,7 @@
                 el.appendChild(cell);
             }
         }
+        document.getElementById('my-color-txt').innerText = "ВЫ: " + (myCol === 'white' ? "БЕЛЫЕ" : "ЧЕРНЫЕ");
         document.getElementById('turn-txt').innerText = turn === myCol ? "ВАШ ХОД" : "ЖДИТЕ";
         document.getElementById('end-turn-btn').style.display = (hasMoved && turn === myCol) ? 'block' : 'none';
     }
@@ -264,10 +295,7 @@
                 if(m) {
                     isBusy = true;
                     const act = { type:'action', move:{fR:sel.r, fC:sel.c, tR:r, tC:c, castle:m.castle}, next:turn };
-                    if(m.castle) {
-                        if(m.castle === 'short') { board[r][c-1] = board[r][c+1]; board[r][c+1] = null; }
-                        else { board[r][c+1] = board[r][c-2]; board[r][c-2] = null; }
-                    }
+                    if(m.castle) { if(m.castle === 'short') { board[r][c-1] = board[r][c+1]; board[r][c+1] = null; } else { board[r][c+1] = board[r][c-2]; board[r][c-2] = null; } }
                     board[r][c] = {...board[sel.r][sel.c], m:true}; board[sel.r][sel.c] = null;
                     sel = {r, c}; hasMoved = true; moves = []; shoots = getMoves(r, c, true);
                     if(shoots.length === 0) finalize(act); else { isBusy = false; if(conn) conn.send(act); }
@@ -275,7 +303,7 @@
                     isBusy = true;
                     const act = { type:'action', shoot:{fR:sel.r, fC:sel.c, tR:r, tC:c, d:CONFIG[board[sel.r][sel.c].t].d}, next:turn==='white'?'black':'white' };
                     await shootFX(sel.r, sel.c, r, c);
-                    board[r][c].hp -= act.shoot.d; if(board[r][c].hp <= 0) { playFart(); const isK = board[r][c].t === 'k'; board[r][c] = null; if(isK) checkWin(); }
+                    board[r][c].hp -= act.shoot.d; if(board[r][c].hp <= 0) { playFart(); if(board[r][c].t === 'k') endGame(target.c); board[r][c] = null; }
                     finalize(act);
                 } else { sel = null; moves = []; shoots = []; }
             }
@@ -285,7 +313,7 @@
                 isBusy = true;
                 const act = { type:'action', shoot:{fR:sel.r, fC:sel.c, tR:r, tC:c, d:CONFIG[board[sel.r][sel.c].t].d}, next:turn==='white'?'black':'white' };
                 await shootFX(sel.r, sel.c, r, c);
-                if(board[r][c]) { board[r][c].hp -= act.shoot.d; if(board[r][c].hp <= 0) { playFart(); const isK = board[r][c].t === 'k'; board[r][c] = null; if(isK) checkWin(); } }
+                if(board[r][c]) { board[r][c].hp -= act.shoot.d; if(board[r][c].hp <= 0) { playFart(); if(board[r][c].t === 'k') endGame(target.c); board[r][c] = null; } }
                 finalize(act);
             }
         }
@@ -296,7 +324,7 @@
         turn = turn==='white' ? 'black' : 'white'; act.next = turn;
         if(sel && board[sel.r][sel.c]) board[sel.r][sel.c].shootOnly = false;
         sel = null; moves = []; shoots = []; hasMoved = false; isBusy = false;
-        if(conn) conn.send(act); render();
+        if(conn) conn.send(act); saveState(); render();
     }
 
     function manualEndTurn() { if(turn === myCol) finalize({type:'action'}); }
@@ -310,16 +338,16 @@
                 [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c&&board[nr][nc].t!=='k') res.push({r:nr,c:nc}); });
             } else [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); });
         } else if(p.t==='n') {
-            [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && board[nr][nc].t!=='k'))) res.push({r:nr,c:nc}); });
+            [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k')))) res.push({r:nr,c:nc}); });
         } else if(p.t==='k') {
-            for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) { if(i===0&&j===0)continue; let nr=r+i, nc=c+j; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && board[nr][nc].t!=='k'))) res.push({r:nr,c:nc}); }
+            for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) { if(i===0&&j===0)continue; let nr=r+i, nc=c+j; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k')))) res.push({r:nr,c:nc}); }
             if(!isS && !p.m) {
                 if(!board[r][c+1] && !board[r][c+2] && board[r][c+3]?.t==='r' && !board[r][c+3].m) res.push({r:r,c:c+2,castle:'short'});
                 if(!board[r][c-1] && !board[r][c-2] && !board[r][c-3] && board[r][c-4]?.t==='r' && !board[r][c-4].m) res.push({r:r,c:c-2,castle:'long'});
             }
         } else {
             const dirs = p.t==='r' ? [[0,1],[0,-1],[1,0],[-1,0]] : p.t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
-            dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]){if(!isS)res.push({r:nr,c:nc});} else { if(board[nr][nc].c!==p.c && board[nr][nc].t!=='k') { if(!isS) res.push({r:nr,c:nc}); } break; } } });
+            dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]){ if(!isS) res.push({r:nr,c:nc}); } else { if(board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); break; } } });
         }
         return res;
     }

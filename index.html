@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TURRET CHESS - v12 Dedicated Server</title>
+    <title>TURRET CHESS - v13 Public Secure</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -239,10 +239,8 @@
     function play(f,t,d){ try{const o=audio.createOscillator(),g=audio.createGain();o.type=t;o.frequency.setValueAtTime(f,audio.currentTime);g.gain.setValueAtTime(0.05,audio.currentTime);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d);}catch(e){} }
 
     function initNetwork() {
+        // Connect to the public PeerJS server with a secure connection
         peer = new Peer({
-            host: 'accessiblebrown.aeza.network',
-            port: 9000,
-            path: '/turret-chess',
             config: { 'iceServers': [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' }
@@ -260,7 +258,7 @@
         peer.on('error', e => { 
             let errorText = "Ошибка: " + e.type;
             if(e.type === 'peer-unavailable') errorText = "Друг не найден. Проверь ID или пусть он обновит страницу.";
-            if(e.type === 'server-error') errorText = "Не удалось подключиться к серверу-посреднику. Попробуйте обновить страницу.";
+            if(e.type === 'server-error') errorText = "Не удалось подключиться к публичному серверу. Он может быть временно недоступен. Попробуйте обновить страницу.";
             document.getElementById('error-box').innerText = errorText;
         });
     }

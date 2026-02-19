@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TURRET CHESS - GRANDMASTER MOBILE</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>TURRET CHESS - PRIVATE SERVER EDITION</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
         :root {
             --bg: #161512;
@@ -17,148 +17,49 @@
         }
 
         body {
-            background: var(--bg);
-            color: #bababa;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-            touch-action: manipulation;
+            background: var(--bg); color: #bababa;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100vh; overflow: hidden; touch-action: manipulation;
         }
 
-        #app-container {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-            max-width: 95vw;
-        }
+        #app-container { display: flex; gap: 20px; align-items: flex-start; max-width: 95vw; }
+        @media (max-width: 800px) { #app-container { flex-direction: column; align-items: center; gap: 10px; } }
 
-        @media (max-width: 800px) {
-            #app-container {
-                flex-direction: column;
-                align-items: center;
-                gap: 10px;
-            }
-        }
+        #board-wrapper { position: relative; border: 4px solid #3d3b38; border-radius: 4px; box-shadow: 0 5px 30px rgba(0,0,0,0.5); }
+        #board { display: grid; grid-template-columns: repeat(8, 65px); grid-template-rows: repeat(8, 65px); background: #333; user-select: none; }
+        @media (max-width: 550px) { #board { grid-template-columns: repeat(8, 11.5vw); grid-template-rows: repeat(8, 11.5vw); } }
 
-        /* Board Styling */
-        #board-wrapper {
-            position: relative;
-            border: 4px solid #3d3b38;
-            border-radius: 4px;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.5);
-        }
-
-        #board {
-            display: grid;
-            grid-template-columns: repeat(8, 65px);
-            grid-template-rows: repeat(8, 65px);
-            background: #333;
-            user-select: none;
-        }
-
-        @media (max-width: 550px) {
-            #board {
-                grid-template-columns: repeat(8, 11.5vw);
-                grid-template-rows: repeat(8, 11.5vw);
-            }
-        }
-
-        .cell {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 45px;
-            cursor: pointer;
-            position: relative;
-            transition: background 0.1s;
-        }
-
-        @media (max-width: 550px) {
-            .cell {
-                font-size: 32px;
-            }
-        }
+        .cell { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 45px; cursor: pointer; position: relative; }
+        @media (max-width: 550px) { .cell { font-size: 32px; } }
 
         .white-cell { background: var(--white-cell); color: #333; }
         .black-cell { background: var(--black-cell); color: #fff; }
-
         .piece-white { color: #fff; text-shadow: 2px 2px #000; }
         .piece-black { color: #000; text-shadow: 0px 0px 2px #fff; }
 
-        /* Highlights */
         .selected { background: var(--highlight) !important; }
-        .valid-move::after {
-            content: '';
-            width: 25%;
-            height: 25%;
-            background: rgba(0,0,0,0.15);
-            border-radius: 50%;
-            position: absolute;
-        }
+        .valid-move::after { content: ''; width: 25%; height: 25%; background: rgba(0,0,0,0.15); border-radius: 50%; position: absolute; }
         .valid-shoot { background: rgba(255, 82, 82, 0.6) !important; box-shadow: inset 0 0 15px #000; }
         .valid-shoot::after { content: '🎯'; font-size: 16px; position: absolute; opacity: 0.8; }
         .valid-castle { background: rgba(66, 165, 245, 0.6) !important; }
-        
-        /* New Shoot Only Glow */
-        .shoot-only-mode {
-            box-shadow: inset 0 0 0 4px var(--shoot-only-glow) !important;
-        }
+        .shoot-only-mode { box-shadow: inset 0 0 0 4px var(--shoot-only-glow) !important; }
 
-        /* HP Bars */
-        .hp-bar {
-            position: absolute;
-            top: 2px;
-            left: 4px;
-            right: 4px;
-            height: 5px;
-            background: rgba(0,0,0,0.5);
-            border-radius: 2px;
-            overflow: hidden;
-            pointer-events: none;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+        .hp-bar { position: absolute; top: 2px; left: 4px; right: 4px; height: 5px; background: rgba(0,0,0,0.5); border-radius: 2px; overflow: hidden; pointer-events: none; }
         .hp-fill { height: 100%; background: #62d62d; transition: width 0.3s; }
 
-        /* Sidebar Styling */
-        #sidebar {
-            width: 260px;
-            background: var(--panel);
-            border-radius: 4px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        @media (max-width: 800px) {
-            #sidebar {
-                width: 90vw;
-                padding: 10px;
-                flex-direction: row;
-                align-items: center;
-                justify-content: space-between;
-            }
-            .hide-mobile { display: none; }
-        }
+        #sidebar { width: 260px; background: var(--panel); border-radius: 4px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+        @media (max-width: 800px) { #sidebar { width: 90vw; padding: 10px; flex-direction: row; align-items: center; justify-content: space-between; } .hide-mobile { display: none; } }
 
         .status-card { background: #1c1a17; padding: 10px; border-radius: 4px; text-align: center; flex-grow: 1; }
         .turn-indicator { font-weight: bold; font-size: 18px; text-transform: uppercase; }
 
-        .btn { background: #403d39; border: none; color: #bababa; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
-        .btn:hover { background: #504d48; color: #fff; }
+        .btn { background: #403d39; border: none; color: #bababa; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .btn-main { background: var(--accent); color: #fff; }
 
-        /* Lobby */
         #lobby-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .lobby-box { background: var(--panel); padding: 30px; border-radius: 8px; text-align: center; border: 1px solid #3d3b38; width: 280px; }
-
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
         #modal-box { background: var(--panel); padding: 40px; border-radius: 8px; text-align: center; border: 2px solid var(--accent); }
 
@@ -173,9 +74,9 @@
 <div id="lobby-overlay">
     <div class="lobby-box">
         <h1 style="color: #fff; margin-top: 0;">BOMBO CHESS</h1>
-        <div id="lobby-status" style="font-size: 14px; margin: 15px 0; color: #ff9800;">Загрузка сети...</div>
+        <div id="lobby-status" style="font-size: 13px; margin: 15px 0; color: #ff9800;">Загрузка сервера...</div>
         <div id="id-display-box" style="display:none">
-            <div id="my-id" onclick="copyId()" style="background: #1c1a1a; padding: 12px; border-radius: 4px; font-weight: bold; color: var(--accent); cursor: pointer; border: 1px solid #333; margin-bottom: 10px; font-size: 13px; word-break: break-all;">----</div>
+            <div id="my-id" onclick="copyId()" style="background: #1c1a1a; padding: 12px; border-radius: 4px; font-weight: bold; color: var(--accent); cursor: pointer; border: 1px solid #333; margin-bottom: 10px; font-size: 13px;">----</div>
             <button class="btn btn-main" style="width: 100%;" onclick="copyInvite()">Копировать ссылку</button>
             <div style="margin: 20px 0; height: 1px; background: #333;"></div>
             <input type="text" id="target-id" placeholder="ID противника" style="background: #1c1a1a; border: 1px solid #333; color: #fff; padding: 12px; width: 100%; box-sizing: border-box; border-radius: 4px; text-align: center; margin-bottom: 10px;">
@@ -202,9 +103,11 @@
 <div id="modal"><div id="modal-box"><h1 id="win-msg" style="color:#fff;">ПОБЕДА!</h1><button class="btn btn-main" style="width: 200px;" onclick="requestRematch()">Реванш</button></div></div>
 
 <script>
+    // --- ВАЖНО: ЗАМЕНИТЕ ЭТУ ССЫЛКУ НА ВАШУ ОТ RENDER.COM ---
+    const MY_SERVER_HOST = 'peerjs.com'; // Например: 'nazar-server.onrender.com'
+    
     const CONFIG = { p:{hp:2,d:1}, r:{hp:7,d:3}, n:{hp:4,d:2}, b:{hp:4,d:2}, q:{hp:10,d:3}, k:{hp:15,d:1} };
     const ICONS = { white:{p:'♙',r:'♖',n:'♘',b:'♗',q:'♕',k:'♔'}, black:{p:'♟',r:'♜',n:'♞',b:'♝',q:'♛',k:'♚'} };
-    
     let board=[], sel=null, moves=[], shoots=[], turn='white', myCol=null, peer, conn, isBusy=false, hasMoved=false;
     let lastTapTime = 0, lastTapCell = {r:null, c:null};
 
@@ -212,21 +115,21 @@
     function play(f,t,d){ try{const o=audio.createOscillator(),g=audio.createGain();o.type=t;o.frequency.setValueAtTime(f,audio.currentTime);g.gain.setValueAtTime(0.05,audio.currentTime);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d);}catch(e){} }
 
     function initNetwork() {
-        // --- STEP 1: STABLE CROSSPLAY CONFIG ---
         peer = new Peer({
-            secure: true, // Required for GitHub Pages HTTPS
+            host: MY_SERVER_HOST,
+            port: 443,
+            path: '/',
+            secure: true,
             config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
         });
 
         peer.on('open', id => {
-            document.getElementById('lobby-status').innerText = "Готов к игре";
+            document.getElementById('lobby-status').innerText = "Сервер онлайн";
             document.getElementById('my-id').innerText = id;
             document.getElementById('id-display-box').style.display = 'block';
-            const joinId = new URLSearchParams(window.location.search).get('join');
-            if(joinId) { document.getElementById('target-id').value = joinId; setTimeout(joinRoom, 1000); }
         });
         peer.on('connection', c => { if(conn) return; conn = c; myCol = 'white'; setupConn(); });
-        peer.on('error', e => alert("Ошибка сети: " + e.type));
+        peer.on('error', e => console.error("PeerJS Error:", e.type));
     }
 
     function joinRoom() {
@@ -307,24 +210,17 @@
         const p = board[r][c];
         const now = Date.now();
         
-        // --- STEP 2: MOBILE DOUBLE TAP LOGIC ---
-        let isShootModeTrigger = (e.button === 2); // Right click
+        let isShootModeTrigger = (e.button === 2);
         if (p && p.c === turn && !hasMoved) {
             if (r === lastTapCell.r && c === lastTapCell.c && (now - lastTapTime < 350)) {
-                isShootModeTrigger = true;
-                lastTapTime = 0; // Reset
-            } else {
-                lastTapTime = now; lastTapCell = {r, c};
-            }
+                isShootModeTrigger = true; lastTapTime = 0;
+            } else { lastTapTime = now; lastTapCell = {r, c}; }
         }
 
         if(!hasMoved) {
             if(p && p.c === turn) {
-                if (sel && sel.r === r && sel.c === c && isShootModeTrigger) {
-                    p.shootOnly = !p.shootOnly;
-                } else if (!sel && isShootModeTrigger) {
-                    p.shootOnly = true;
-                }
+                if (sel && sel.r === r && sel.c === c && isShootModeTrigger) { p.shootOnly = !p.shootOnly; }
+                else if (!sel && isShootModeTrigger) { p.shootOnly = true; }
                 sel = {r, c};
                 if(p.shootOnly) { shoots = getMoves(r, c, true); moves = []; }
                 else { moves = getMoves(r, c, false); shoots = []; }
@@ -333,7 +229,6 @@
                 if(m) {
                     isBusy = true;
                     const act = { type:'action', move:{fR:sel.r, fC:sel.c, tR:r, tC:c, castle:m.castle}, next:turn };
-                    if(m.castle) { if(m.castle === 'short') { board[r][c-1] = board[r][c+1]; board[r][c+1] = null; } else { board[r][c+1] = board[r][c-2]; board[r][c-2] = null; } }
                     board[r][c] = {...board[sel.r][sel.c], m:true}; board[sel.r][sel.c] = null;
                     sel = {r, c}; play(300, 'sine', 0.1); hasMoved = true; moves = []; shoots = getMoves(r, c, true);
                     if(shoots.length === 0) finalize(act); else { isBusy = false; if(conn) conn.send(act); }
@@ -373,19 +268,15 @@
         if(p.t==='p') {
             if(!isS) {
                 if(r+dr>=0 && r+dr<8 && !board[r+dr][c]) { res.push({r:r+dr,c}); if(!p.m && !board[r+2*dr][c]) res.push({r:r+2*dr,c}); }
-                [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c&&board[nr][nc].t!=='k') res.push({r:nr,c:nc}); });
+                [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); });
             } else [[dr,1],[dr,-1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8&&board[nr][nc]&&board[nr][nc].c!==p.c) res.push({r:nr,c:nc}); });
         } else if(p.t==='n') {
-            [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k')))) res.push({r:nr,c:nc}); });
+            [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(v=>{ let nr=r+v[0], nc=c+v[1]; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || board[nr][nc].c!==p.c)) res.push({r:nr,c:nc}); });
         } else if(p.t==='k') {
-            for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) { if(i===0&&j===0)continue; let nr=r+i, nc=c+j; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || (board[nr][nc].c!==p.c && (isS || board[nr][nc].t!=='k')))) res.push({r:nr,c:nc}); }
-            if(!isS && !p.m) {
-                if(!board[r][c+1] && !board[r][c+2] && board[r][c+3]?.t==='r' && !board[r][c+3].m) res.push({r:r,c:c+2,castle:'short'});
-                if(!board[r][c-1] && !board[r][c-2] && !board[r][c-3] && board[r][c-4]?.t==='r' && !board[r][c-4].m) res.push({r:r,c:c-2,castle:'long'});
-            }
+            for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) { if(i===0&&j===0)continue; let nr=r+i, nc=c+j; if(nr>=0&&nr<8&&nc>=0&&nc<8 && (!board[nr][nc] || board[nr][nc].c!==p.c)) res.push({r:nr,c:nc}); }
         } else {
             const dirs = p.t==='r' ? [[0,1],[0,-1],[1,0],[-1,0]] : p.t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
-            dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]){if(!isS)res.push({r:nr,c:nc});} else {if(board[nr][nc].c!==p.c&&(isS||board[nr][nc].t!=='k'))res.push({r:nr,c:nc}); break;} } });
+            dirs.forEach(v=>{ for(let i=1;i<8;i++){ let nr=r+v[0]*i, nc=c+v[1]*i; if(nr<0||nr>=8||nc<0||nc>=8)break; if(!board[nr][nc]){if(!isS)res.push({r:nr,c:nc});} else {if(board[nr][nc].c!==p.c)res.push({r:nr,c:nc}); break;} } });
         }
         return res;
     }
@@ -400,7 +291,7 @@
             function anim(t){
                 const p=Math.min((t-start)/300,1); b.style.left=s.x+(e.x-s.x)*p+'px'; b.style.top=s.y+(e.y-s.y)*p+'px';
                 if(p<1)requestAnimationFrame(anim);
-                else { b.remove(); const ex=document.createElement('div'); ex.className='explosion'; ex.style.left=e.x+'px'; ex.style.top=e.y+'px'; layer.appendChild(ex); play(100,'square',0.2); setTimeout(()=>{ex.remove(); res();},300); }
+                else { b.remove(); const ex=document.createElement('div'); ex.className='explosion'; ex.style.left=e.x+'px'; ex.style.top=e.y+'px'; layer.appendChild(ex); setTimeout(()=>{ex.remove(); res();},300); }
             }
             requestAnimationFrame(anim);
         });
@@ -413,7 +304,6 @@
     }
 
     function endGame(lostColor) { document.getElementById('win-msg').innerText = lostColor==='white' ? "ЧЕРНЫЕ ПОБЕДИЛИ!" : "БЕЛЫЕ ПОБЕДИЛИ!"; document.getElementById('modal').style.display='flex'; }
-    function requestRematch() { if(conn) conn.send({type:'rematch_req'}); alert("Запрос отправлен!"); }
     function copyInvite() { navigator.clipboard.writeText(window.location.origin+window.location.pathname+"?join="+document.getElementById('my-id').innerText); alert("Ссылка скопирована!"); }
     function copyId() { navigator.clipboard.writeText(document.getElementById('my-id').innerText); alert("ID скопирован!"); }
 
